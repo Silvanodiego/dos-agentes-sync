@@ -20,6 +20,7 @@ network_access = true
 
 # cmd.exe expande USERPROFILE; el instalador tambien expande el marcador.
 [mcp_servers.antigravity_bridge]
+enabled = true
 command = 'cmd.exe'
 args = ['/d', '/c', '"%USERPROFILE%\ScriptsGlobales\antigravity_mcp.bat"']
 startup_timeout_sec = 30

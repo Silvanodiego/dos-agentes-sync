@@ -1,5 +1,33 @@
 # Registro de cambios
 
+## 2026-11-23 - Instalador limpio PC 3 v5
+
+- Se completo el destino antes inexistente `scripts/instalar_pc3.ps1` de
+  `instalar.bat`: seis etapas visibles, integridad SHA256 antes de instalar,
+  elevacion, requisitos mediante winget, pip, npm ci y reintento con VCTools.
+- Node.js 24 se selecciona por su identificador winget `OpenJS.NodeJS.24`.
+  Antigravity Manager se resuelve desde la API oficial de releases y se valida
+  contra su digest SHA256; se elimina la dependencia de URLs fijas que daban 404.
+- `scripts/configurar_pc3.py` expande USERPROFILE despues de parsear TOML,
+  conserva notify y MCPs existentes, rechaza duplicados y habilita
+  antigravity_bridge. Prepara AGENTS Cascada AG, adaptadores y bases nuevas
+  con solo esquemas. No importa cuentas, perfiles ni credenciales.
+- Startup usa arrancar_todo_oculto.vbs; DosAgentesGitSync registra el flujo
+  auto_sync_git oculto cada diez minutos. En PC 1 ambos ya estaban correctos:
+  se verificaron sin recrearlos ni reiniciar servicios.
+- `agy.bat --version` y `-v` responden agy 1.0.0 sin inferencia. Los adaptadores
+  admiten DOS_AGENTES_ROOT; el MCP esta habilitado en la plantilla compartida.
+- `scripts/crear_paquete_pc3.py` exporta fuentes versionadas y genera v5 con
+  manifiesto, hashes, validacion batch y exclusion de DB/logs/cache/venv,
+  node_modules, auth, perfiles Chrome y credenciales Antigravity. Copias
+  identicas en Escritorio y Drive. LEEME_PC3_v5.md documenta autenticaciones.
+- Pruebas: TOML portable y fusion conservadora, rechazo de notify duplicado,
+  idempotencia y preservacion de DB/token existentes, exclusiones, lockfile,
+  sintaxis Python/PowerShell y verificacion real de instalar.bat -Verificar.
+- No se modificaron bridge_server.py, consultar_gemini.py, bucle_autonomo.py
+  ni los respaldos. Cascada AG devolvio HTTP 502 en la consulta de analisis;
+  no se reintento inferencia y las comprobaciones fueron locales.
+
 ## 2026-11-23 — Chat Fijo Gemini independiente de Cascada AG
 
 Archivos nuevos en `C:\dos_agentes_local\`:
