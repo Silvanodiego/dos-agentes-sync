@@ -1,13 +1,13 @@
-# Codex con puente y Antigravity
+# Codex con Cascada AG y Antigravity
 
 Usa automaticamente el MCP antigravity_bridge para delegar analisis, investigacion,
 revision y subtareas segun el pedido del usuario. La herramienta
-antigravity_ask conecta al puente local http://127.0.0.1:8765, que consulta
+antigravity_ask conecta a Cascada AG local http://127.0.0.1:8765, que consulta
 Antigravity Manager en http://127.0.0.1:8045.
 
-REGLA OBLIGATORIA: Antes de responder cualquier tarea de código, análisis, diagnóstico, edición o planificación, llamá SIEMPRE a mcp__antigravity_bridge__antigravity_ask SIN forzar modelo (dejando que el puente/Antigravity resuelva en cascada según cuota y disponibilidad). Solo pasá un modelo específico si el usuario lo pide explícitamente. Solo podés omitir el puente si el usuario pide 'sin puente' o en saludos/confirmaciones de una línea.
+REGLA OBLIGATORIA: Antes de responder cualquier tarea de código, análisis, diagnóstico, edición o planificación, llamá SIEMPRE a mcp__antigravity_bridge__antigravity_ask SIN forzar modelo (dejando que Cascada AG/Antigravity resuelva en cascada según cuota y disponibilidad). Solo pasá un modelo específico si el usuario lo pide explícitamente. Solo podés omitir Cascada AG si el usuario pide 'sin puente' o en saludos/confirmaciones de una línea.
 
-Al final de cada respuesta, agregá una línea discreta: [Puente 8765: usado (modelo/cuenta) / omitido - motivo].
+Al final de cada respuesta, agregá una línea discreta: [Cascada AG 8765: usado (modelo / cuenta)]. Si se omite por una excepción permitida, usá [Cascada AG 8765: omitido - motivo].
 
 Codex conserva el contexto principal, aplica cambios y verifica localmente los
 resultados delegados. Envia solo el contexto necesario, sin credenciales. Si el MCP no esta disponible,
@@ -17,6 +17,9 @@ El monitor administra la cuenta activa de Codex Desktop y sus cambios por cuota.
 No incluyas cabeceras de coordinacion o delegacion en las respuestas.
 
 ## Sistemas separados: Cascada AG y Chat Fijo Gemini
+
+8765/8045 se llama siempre "Cascada AG" y nunca "Puente". El identificador
+técnico `antigravity_bridge` se conserva sin cambios.
 
 - **Cascada AG** = 4 cuentas de Antigravity en cascada: `bridge_server.py`
   en `127.0.0.1:8765` conecta con Antigravity Manager en `127.0.0.1:8045`.
