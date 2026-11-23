@@ -1,8 +1,11 @@
 """Pruebas sin enviar mensajes ni ejecutar Codex real."""
 from contextlib import nullcontext
 import io
+import os
 from pathlib import Path
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
@@ -11,6 +14,32 @@ import chat_fijo_gemini as chat
 import piloto_gemini as piloto
 
 URL = "https://gemini.google.com/app/abc123?hl=es_419"
+
+
+class EncodingTests(unittest.TestCase):
+    def test_console_emojis_and_special_characters_override_cp1252(self):
+        text = "Avance: café, ñ, ¿listo? 🚀 ✅"
+        env = dict(os.environ, PYTHONIOENCODING="cp1252:strict")
+        for module in ("chat_fijo_gemini", "piloto_gemini"):
+            with self.subTest(module=module):
+                # El proceso comienza en cp1252: fallaría sin el fix del módulo.
+                code = (f"import {module}, sys; "
+                        f"print({text!r}); print({text!r}, file=sys.stderr)")
+                result = subprocess.run([sys.executable, "-c", code],
+                                        cwd=Path(__file__).resolve().parent,
+                                        env=env, capture_output=True, timeout=15)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.decode("utf-8").strip(), text)
+                self.assertEqual(result.stderr.decode("utf-8").strip(), text)
+
+    def test_import_with_non_reconfigurable_capture(self):
+        code = ("import sys, io; sys.stdout = io.StringIO(); "
+                "sys.stderr = io.StringIO(); import chat_fijo_gemini, piloto_gemini; "
+                "print('🚀 café'); assert sys.stdout.getvalue() == '🚀 café\\n'")
+        result = subprocess.run([sys.executable, "-c", code],
+                                cwd=Path(__file__).resolve().parent,
+                                capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 class ConfigTests(unittest.TestCase):
@@ -163,6 +192,19 @@ class ModelTests(unittest.TestCase):
 
 
 class PilotTests(unittest.TestCase):
+    def test_child_inherits_utf8_and_output_is_read_as_utf8(self):
+        text = "Respaldo verificado: ñ 🚀"
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "salida.txt"
+            output.write_text(text, encoding="utf-8")
+            process = MagicMock(returncode=0)
+            with patch.object(piloto.shutil, "which", return_value="codex.exe"), \
+                    patch.object(piloto.subprocess, "Popen", return_value=process) as popen, \
+                    patch.dict(os.environ, {"PYTHONIOENCODING": "cp1252"}):
+                self.assertEqual(piloto.codex_step(Path(temp), text, output, 1), text)
+                self.assertEqual(popen.call_args.kwargs["env"]["PYTHONIOENCODING"], "utf-8")
+                self.assertEqual(popen.call_args.kwargs["encoding"], "utf-8")
+
     def test_marker_must_be_own_line(self):
         self.assertTrue(piloto.delivery_complete("Terminado\n[ENTREGA_FINAL]\nResumen"))
         self.assertFalse(piloto.delivery_complete("Todavía no usar [ENTREGA_FINAL]."))

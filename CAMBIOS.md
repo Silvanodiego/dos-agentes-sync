@@ -269,3 +269,11 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - Agregado ciclo autonomo de avance/consulta, excepciones ENTREGA_FINAL y credenciales manuales, y etiqueta de cierre. Se conserva el alcance autorizado y la proteccion de credenciales.
 - Documentada equivalencia de --proyecto/--mensaje con los argumentos reales --project/--message, sin modificar chat_fijo_gemini.py.
 - bridge_server.py, scripts de respaldo y respaldos existentes se mantienen intactos.
+
+# 2026-11-23 - Consola UTF-8 para Chat Fijo Gemini y piloto
+
+- chat_fijo_gemini.py y piloto_gemini.py reconfiguran stdout/stderr con UTF-8 y errors=replace, tolerando capturadores sin reconfigure, streams cerrados y errores de consola.
+- Revisadas todas las operaciones de archivos de texto/JSON: mantienen encoding=utf-8 explicito; el lock binario conserva su modo a+b.
+- El entorno del subproceso del piloto fuerza PYTHONIOENCODING=utf-8 y conserva el entorno del sistema.
+- Pruebas nuevas: salida de emojis/acentos desde consola cp1252 en ambos modulos, captura sin reconfigure y herencia UTF-8/lectura de salida del piloto. Los 24 tests de test_chat_fijo_gemini.py pasan sin acceder al chat ni ejecutar Codex real.
+- Verificados por SHA256 bridge_server.py y ocho scripts/archivos de respaldo: sin cambios.

@@ -11,6 +11,13 @@ import subprocess
 import sys
 import uuid
 
+# Configurar cada salida por separado para tolerar capturadores y pythonw.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError, ValueError):
+        pass
+
 from chat_fijo_gemini import (DATABASE, ROOT, ChatFijoError, GeminiChat,
                               chat_lock, normalize_project, resolve_chat)
 
@@ -54,6 +61,7 @@ def codex_step(folder: Path, prompt: str, output: Path, timeout: float) -> str:
     if not executable:
         raise ChatFijoError("No se encontró codex.exe en PATH; instalá/autenticá Codex CLI.")
     env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
     for key in ("CODEX_THREAD_ID", "CODEX_TURN_ID"):
         env.pop(key, None)
     command = [executable, "exec", "--sandbox", "workspace-write", "--skip-git-repo-check",

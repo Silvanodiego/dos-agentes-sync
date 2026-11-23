@@ -16,6 +16,13 @@ import time
 import unicodedata
 from urllib.parse import urlsplit
 
+# También funciona con salida redirigida; algunos capturadores no reconfiguran.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError, ValueError):
+        pass
+
 ROOT = Path(__file__).resolve().parent
 DATABASE = ROOT / "estado_puente.db"
 ENDPOINT = "http://127.0.0.1:9222"
