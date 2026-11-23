@@ -24,6 +24,9 @@
 - Pruebas: TOML portable y fusion conservadora, rechazo de notify duplicado,
   idempotencia y preservacion de DB/token existentes, exclusiones, lockfile,
   sintaxis Python/PowerShell y verificacion real de instalar.bat -Verificar.
+- La prueba real detecto herencia de PSModulePath de PowerShell 7 al lanzar
+  Windows PowerShell 5.1 desde Python. instalar.bat usa rutas de modulos 5.1
+  solo dentro de setlocal, evitando que falte Get-FileHash sin cambiar el sistema.
 - No se modificaron bridge_server.py, consultar_gemini.py, bucle_autonomo.py
   ni los respaldos. Cascada AG devolvio HTTP 502 en la consulta de analisis;
   no se reintento inferencia y las comprobaciones fueron locales.
