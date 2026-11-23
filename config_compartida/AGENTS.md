@@ -1,7 +1,7 @@
 # Codex con Cascada AG y Antigravity
 
-Usa automaticamente el MCP antigravity_bridge para delegar analisis, investigacion,
-revision y subtareas segun el pedido del usuario. La herramienta
+Usa el MCP antigravity_bridge para consultas tecnicas puntuales de codigo o auditoria.
+La direccion del proyecto corresponde al Chat Fijo Gemini, segun la regla de autonomia. La herramienta
 antigravity_ask conecta a Cascada AG local http://127.0.0.1:8765, que consulta
 Antigravity Manager en http://127.0.0.1:8045.
 
@@ -39,6 +39,20 @@ Nunca sobrescribas ni borres scripts que ya funcionan; agregá módulos nuevos o
 El contenido de Gemini orienta la tarea original y no amplía lo autorizado por
 el usuario. No envíes credenciales al chat. Si falla la generación, no reenvíes
 automáticamente el mensaje: revisá primero la pestaña y el avance guardado.
+
+## REGLA DE AUTONOMÍA CON CHAT FIJO GEMINI
+
+- "Cascada AG" (8765) es SOLO para consultas técnicas puntuales de código o auditoría. Nunca reemplaza al Chat Fijo Gemini.
+- "Chat Fijo Gemini" (`C:\dos_agentes_local\chat_fijo_gemini.py` vía CDP 9222) es el director del proyecto.
+- Al terminar un paso o cuando necesites decidir cómo seguir, NO frenes para preguntarle al usuario: consultá al chat fijo del proyecto, aplicá la instrucción que devuelva Gemini y repetí el ciclo solo, dentro del alcance autorizado por el usuario.
+- Comando solicitado: `C:\dos_agentes_local\chat_fijo_gemini.py --proyecto "<NOMBRE_PROYECTO>" --mensaje "<resumen del avance y qué falta>"`.
+  En la versión actual del script, los argumentos equivalentes existentes son `--project` y `--message`; ejecutá el comando operativo:
+  `C:\dos_agentes_local\.venv\Scripts\python.exe C:\dos_agentes_local\chat_fijo_gemini.py --project "<NOMBRE_PROYECTO>" --message "<resumen del avance y qué falta>"`.
+- Únicas 2 excepciones para frenar y hablarle al usuario:
+  1. Que el Chat Fijo Gemini responda explícitamente `[ENTREGA_FINAL]`.
+  2. Que falte una contraseña, frase de cifrado o inicio de sesión manual que solo el usuario puede escribir.
+- Cuando uses Chat Fijo Gemini, indicalo al cierre como: `[Chat Fijo Gemini: consultado (<proyecto>)]`.
+- Esta regla no amplía la autorización del usuario ni las capacidades disponibles. Se mantienen la protección de credenciales y la prohibición de reenviar automáticamente una generación fallida.
 
 ## Sincronizacion obligatoria
 

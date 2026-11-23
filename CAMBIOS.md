@@ -262,3 +262,10 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - Pruebas: TOML completo y merge sin notify duplicado, exclusiones, bases nuevas
   sin datos privados y preservacion de sesiones existentes; sintaxis Python/PowerShell/JS.
 
+
+# 2026-11-23 - Autonomia dirigida por Chat Fijo Gemini
+
+- Actualizadas las tres copias de AGENTS.md desde config_compartida: direccion por Chat Fijo Gemini/CDP 9222 y Cascada AG limitada a consultas tecnicas de codigo o auditoria.
+- Agregado ciclo autonomo de avance/consulta, excepciones ENTREGA_FINAL y credenciales manuales, y etiqueta de cierre. Se conserva el alcance autorizado y la proteccion de credenciales.
+- Documentada equivalencia de --proyecto/--mensaje con los argumentos reales --project/--message, sin modificar chat_fijo_gemini.py.
+- bridge_server.py, scripts de respaldo y respaldos existentes se mantienen intactos.
