@@ -187,3 +187,29 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
   sin enviar otra consulta ni crear otro chat.
 - Se conservan los hashes originales y diff vacío de `bridge_server.py`,
   `consultar_gemini.py` y `bucle_autonomo.py`. No se cambió Cascada AG ni el MCP.
+
+## 2026-11-23 — Cascada AG y arranque invisible de Windows
+
+- `config_compartida/AGENTS.md`: denominación y cierre obligatorios actualizados
+  a Cascada AG 8765; 8765/8045 se llama siempre Cascada AG, nunca Puente.
+  Copia idéntica aplicada a `C:\dos_agentes_local\AGENTS.md` y
+  `C:\Users\H_P\.codex\AGENTS.md`. El identificador técnico del MCP se conserva.
+- Nuevo `abrir_chrome_gemini_oculto.bat`: detecta Chrome y luego Edge, verifica
+  TCP 9222 antes de abrir y usa --headless=new, perfil dedicado,
+  --no-first-run y --no-default-browser-check. Espera de conexión acotada a 15 s.
+- Nuevo `arrancar_todo_oculto.vbs`: ejecuta el BAT del navegador y luego
+  `sync_y_arrancar.bat` mediante WScript.Shell.Run con ventana 0.
+- `sync_y_arrancar.bat`: comprueba 127.0.0.1:9222 y llama al lanzador oculto
+  solo si el puerto no está escuchando; mantiene el sincronizador existente.
+- Inicio de sesión del usuario registrado mediante el acceso directo
+  `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\DosAgentesInicioOculto.lnk`
+  a `wscript.exe //B //Nologo "C:\dos_agentes_local\arrancar_todo_oculto.vbs"`.
+  Se retiró únicamente la entrada anterior DosAgentesSync del Registro HKCU Run
+  para evitar el arranque duplicado. La instalación es local a esta PC.
+- Verificación: VBS válido y ambas llamadas con ventana 0; detección y flags
+  comprobados mediante lanzamiento simulado; con 9222 abierto el BAT termina
+  correctamente sin lanzar otro navegador. Tres AGENTS idénticos. La sesión
+  actual de Chrome se conserva; el modo headless queda configurado para el
+  próximo inicio, sin cerrar la sesión existente durante las pruebas.
+- `bridge_server.py`, `consultar_gemini.py` y `bucle_autonomo.py` mantienen sus
+  hashes originales y diff vacío; no se modificó el MCP ni Cascada AG.
