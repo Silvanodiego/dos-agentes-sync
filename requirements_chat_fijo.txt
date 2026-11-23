@@ -1,0 +1,2 @@
+# Cliente Python; se conecta al Chrome/Edge existente y no instala otro navegador.
+playwright>=1.48,<2
