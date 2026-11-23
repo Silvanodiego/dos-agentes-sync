@@ -72,3 +72,4 @@ repos_referencia/
 *_bak_*.py
 /AGENTS.md
 config_backups/
+chrome_gemini_profile/

@@ -76,3 +76,30 @@ ni cambia perfiles, cuentas, túneles o procesos por su cuenta.
 - Los tres scripts protegidos se verifican con SHA256 y diff de Git antes del commit.
 
 Referencia técnica: [Playwright Python — Browser y conexión CDP](https://playwright.dev/python/docs/api/class-browser).
+
+## 2026-11-23 — Lanzador de Chrome/Edge y prueba de conexión
+
+- **Nuevo `abrir_chrome_gemini.bat`:** detecta Chrome en las ubicaciones de
+  instalación habituales y en PATH; si falta, busca Edge. Abre el navegador
+  con `--remote-debugging-port=9222`, el perfil dedicado
+  `C:\dos_agentes_local\chrome_gemini_profile` y la URL fija
+  `https://gemini.google.com/app/ebb372bdb46e6358?hl=es_419`.
+  Devuelve error si no encuentra navegador o falla el lanzamiento.
+- **`.gitignore`:** agregado `chrome_gemini_profile/` para excluir íntegramente
+  el perfil, incluidas cookies, sesiones y cualquier archivo de código que
+  pudiera contener. `git check-ignore` confirmó la exclusión.
+- **`CAMBIOS.md`:** agregado este registro. No se creó ningún ZIP ni se cambió
+  `bridge_server.py`, el MCP, `consultar_gemini.py` o `bucle_autonomo.py`.
+- Chrome y Edge están instalados. La revisión automática rechazó el comando
+  `Start-Process` que ejecutaba el BAT en segundo plano con el mensaje
+  **`blocked by policy`**, sin detallar otro motivo. Ese comando no se ejecutó;
+  no se intentó eludir el bloqueo mediante otra herramienta de lanzamiento.
+- `chat_fijo_gemini.py --project DOS_AGENTES --check --connect-timeout 3`
+  informó de forma controlada que 9222 no responde. También se consultó
+  `http://127.0.0.1:9222/json/version` durante hasta 15 segundos.
+- La prueba con el mensaje `Prueba de conexión desde Chat Fijo Gemini.
+  Respondé solo: CONEXION_OK` queda pendiente: no hubo conexión CDP, no se
+  envió ningún mensaje, no se recibió una respuesta y no se pudo verificar
+  el inicio de sesión. No se afirma que se haya abierto una ventana.
+- Se verifica el hash SHA256 original de `bridge_server.py` y su diff vacío
+  antes del commit. Solo se incluyen el BAT nuevo, `.gitignore` y este registro.
