@@ -95,7 +95,7 @@ def main(argv=None) -> int:
         folder = resolve_folder(args.project, args.folder)
         name = folder.name if Path(args.project).is_dir() else args.project
         config = resolve_chat(name)
-        with chat_lock(config.url), GeminiChat(config) as chat:
+        with chat_lock(config.project), GeminiChat(resolve_chat(name)) as chat:
             # Validar conexión, sesión, chat y editor ANTES de ejecutar Codex.
             chat.prepare()
             run = ROOT / ".sync-local" / "chat-fijo" / (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ_") + uuid.uuid4().hex[:8])

@@ -14,7 +14,7 @@ URL = "https://gemini.google.com/app/abc123?hl=es_419"
 
 
 class ConfigTests(unittest.TestCase):
-    def test_project_and_fallback_read_only(self):
+    def test_project_and_new_project_read_only(self):
         with tempfile.TemporaryDirectory() as temp:
             db = Path(temp) / "estado.db"
             connection = sqlite3.connect(db)
@@ -25,7 +25,8 @@ class ConfigTests(unittest.TestCase):
             connection.close()
             before = db.read_bytes()
             self.assertEqual(chat.resolve_chat("otro proyecto", db).project, "OTRO_PROYECTO")
-            self.assertTrue(chat.resolve_chat("no existe", db).fallback)
+            missing = chat.resolve_chat("no existe", db)
+            self.assertEqual((missing.project, missing.url, missing.fallback), ("NO_EXISTE", "", False))
             self.assertEqual(before, db.read_bytes())
 
     def test_missing_database_not_created(self):
@@ -49,6 +50,63 @@ class ConfigTests(unittest.TestCase):
         with patch.object(chat.socket, "create_connection", side_effect=TimeoutError), self.assertRaisesRegex(
                 chat.ChatFijoError, "--remote-debugging-port=9222"):
             chat.check_port(0.1)
+
+
+class CreationTests(unittest.TestCase):
+    def test_create_persist_and_reuse_own_chat(self):
+        with tempfile.TemporaryDirectory() as temp:
+            db = Path(temp) / "estado.db"
+            with sqlite3.connect(db) as conn:
+                conn.execute("CREATE TABLE config_chats(proyecto TEXT PRIMARY KEY, url TEXT)")
+                conn.execute("INSERT INTO config_chats VALUES (?,?)", ("DOS_AGENTES", URL))
+            conn.close()
+            config = chat.resolve_chat("nuevo proyecto", db)
+            saved = chat.save_chat(config, URL.replace("abc123", "new456"))
+            self.assertEqual(chat.resolve_chat("nuevo proyecto", db), saved)
+            self.assertEqual(saved.url, "https://gemini.google.com/app/new456")
+            self.assertEqual(chat.resolve_chat("DOS_AGENTES", db).url, URL)
+            with self.assertRaises(chat.ChatFijoError):
+                chat.save_chat(config, URL.replace("abc123", "another"))
+            with self.assertRaises(chat.ChatFijoError):
+                chat.save_chat(saved, chat.HOME)
+
+    def test_blank_and_legacy_home_url_allow_creation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            db = Path(temp) / "estado.db"
+            with sqlite3.connect(db) as conn:
+                conn.execute("CREATE TABLE config_chats(proyecto TEXT PRIMARY KEY, url TEXT)")
+                conn.executemany("INSERT INTO config_chats VALUES (?,?)", [("EMPTY", None), ("HOME", chat.HOME)])
+            conn.close()
+            for name in ("EMPTY", "HOME"):
+                config = chat.resolve_chat(name, db)
+                self.assertEqual(config.url, "")
+                chat.save_chat(config, URL)
+                self.assertTrue(chat.resolve_chat(name, db).url.endswith("abc123"))
+
+    def test_redirect_creates_only_before_send(self):
+        client = chat.GeminiChat(chat.ChatConfig("DOS_AGENTES", URL, False))
+        client.page = MagicMock(url=chat.HOME)
+        client.ensure_target()
+        self.assertTrue(client.creating)
+        client.page.url = URL.replace("abc123", "new456")
+        with self.assertRaises(chat.ChatFijoError):
+            client.ensure_target()
+        client.message_sent = True
+        client.ensure_target()
+        with patch.object(chat, "save_chat", return_value=chat.ChatConfig("DOS_AGENTES", client.page.url, False)) as save:
+            self.assertTrue(client.capture_chat())
+            self.assertTrue(client.capture_chat())
+            save.assert_called_once()
+        client.page.url = chat.HOME
+        with self.assertRaises(chat.ChatFijoError):
+            client.ensure_target()
+
+    def test_login_never_creates_or_saves_chat(self):
+        client = chat.GeminiChat(chat.ChatConfig("DOS_AGENTES", "", False))
+        client.page = MagicMock(url="https://accounts.google.com/")
+        with self.assertRaisesRegex(chat.ChatFijoError, "iniciar sesión"):
+            client.ensure_target()
+        self.assertFalse(client.capture_chat())
 
 
 class ResponseTests(unittest.TestCase):

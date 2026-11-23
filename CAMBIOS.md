@@ -146,3 +146,44 @@ Referencia técnica: [Playwright Python — Browser y conexión CDP](https://pla
 
 Referencia: [Playwright — estados de carga](https://playwright.dev/python/docs/api/class-page#page-wait-for-load-state)
 y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
+
+
+## 2026-11-23 — Chat fijo para la cuenta nueva y persistencia automática
+
+- **`abrir_chrome_gemini.bat`:** la URL inicial ahora es
+  `https://gemini.google.com/app`, sin el ID de la cuenta anterior. Conserva
+  detección de Chrome/Edge, perfil dedicado y CDP 9222.
+- **`chat_fijo_gemini.py`:** un proyecto sin URL (fila ausente, NULL, vacía o
+  `/app`) prepara un chat nuevo. Una URL fija que redirige a `/app` antes del
+  envío también habilita esa creación. Cada proyecto tiene su propio chat;
+  deja de heredar la URL de DOS_AGENTES para proyectos no registrados.
+  La preparación conserva espera de carga/editor, estabilización de 2 segundos,
+  selección del mejor modelo habilitado, STOP sin audio y respuesta estable 3 s.
+- Después de un único envío, reconoce la transición `/app` a `/app/ID` y guarda
+  únicamente una URL fija HTTPS válida en `config_chats`, asociada al proyecto.
+  Guarda el ID apenas aparece para no perder el vínculo si la generación tarda;
+  solo devuelve éxito cuando hay respuesta completa y URL persistida. No guarda
+  `/app` como URL fija. El resultado JSON incluye `url`, `model` y `response`.
+  Login u otra navegación inesperada detienen el flujo sin reenvío automático.
+- Persistencia SQLite acotada al proyecto, conexión mode=rw (sin crear bases
+  faltantes), transacción y comparación de URL previa para no sobrescribir
+  cambios de otro proceso. Bloqueo por proyecto desde antes de releer la
+  configuración: funciona aunque todavía no exista URL y aunque cambie el ID.
+- **`piloto_gemini.py`:** parche puntual para usar ese bloqueo por proyecto y
+  releer la configuración dentro del bloqueo. No cambia la ejecución de Codex
+  ni el protocolo de cierre del piloto.
+- **`estado_puente.db` (local, excluido de Git):** se limpió exclusivamente la
+  URL vieja de DOS_AGENTES (`ebb372bdb46e6358`). La prueba real creó y guardó
+  `https://gemini.google.com/app/01a343165a8505af` en esa misma fila. No se
+  borraron otras filas ni se cambió el esquema. La base y el perfil no se suben.
+- **`test_chat_fijo_gemini.py`:** 21 pruebas aprobadas; cubren proyecto nuevo
+  sin herencia, persistencia y reutilización, NULL y `/app`, rechazo de URL
+  base/no válida, conflicto concurrente, transición de URL antes/después del
+  envío, login, respuesta estable y cuota/modelos, además del piloto existente.
+- **Prueba real solicitada:** CDP 9222 respondió. Se envió una sola vez
+  `Prueba de conexión desde Chat Fijo Gemini. Respondé solo: CONEXION_OK`.
+  Modelo web confirmado: **Neon**. Respuesta exacta completa: **CONEXION_OK**.
+  Se verificó luego que preparar otra conexión reutiliza la URL fija guardada,
+  sin enviar otra consulta ni crear otro chat.
+- Se conservan los hashes originales y diff vacío de `bridge_server.py`,
+  `consultar_gemini.py` y `bucle_autonomo.py`. No se cambió Cascada AG ni el MCP.

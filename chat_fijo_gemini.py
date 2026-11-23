@@ -19,6 +19,7 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parent
 DATABASE = ROOT / "estado_puente.db"
 ENDPOINT = "http://127.0.0.1:9222"
+HOME = "https://gemini.google.com/app"
 EDITOR = 'rich-textarea [contenteditable="true"], [contenteditable="true"][role="textbox"], textarea[aria-label]'
 SEND = 'button.send-button:visible, button[aria-label="Send message"]:visible, button[aria-label="Enviar mensaje"]:visible'
 
@@ -80,6 +81,7 @@ class ChatConfig:
     project: str
     url: str
     fallback: bool
+    database: Path = DATABASE
 
 
 def resolve_chat(project: str, database: Path = DATABASE) -> ChatConfig:
@@ -90,12 +92,46 @@ def resolve_chat(project: str, database: Path = DATABASE) -> ChatConfig:
         raise ChatFijoError(f"No se pudo leer config_chats en {database}: {exc}") from exc
     chats = {normalize_project(name): (name, url) for name, url in rows}
     key = normalize_project(project)
-    selected = chats.get(key) or chats.get("DOS_AGENTES")
-    if not selected:
-        raise ChatFijoError("Proyecto no registrado y falta el fallback DOS_AGENTES en config_chats.")
-    name, url = selected
-    chat_identity(url)
-    return ChatConfig(name, url, key not in chats)
+    if not key:
+        raise ChatFijoError("El proyecto no puede estar vacío.")
+    # Cada proyecto crea su propio chat: nunca heredar el de otra carpeta.
+    name, url = chats.get(key, (key, ""))
+    url = (url or "").strip()
+    if url and url.rstrip("/") != HOME:
+        chat_identity(url)
+    else:
+        url = ""
+    return ChatConfig(name, url, False, database)
+
+
+def save_chat(config: ChatConfig, url: str) -> ChatConfig:
+    host, path = chat_identity(url)
+    url = "https://" + host + path
+    try:
+        with closing(sqlite3.connect(config.database.resolve().as_uri() + "?mode=rw", uri=True, timeout=3)) as db:
+            with db:
+                db.execute("BEGIN IMMEDIATE")
+                rows = db.execute("SELECT proyecto, url FROM config_chats").fetchall()
+                matches = [(name, old) for name, old in rows
+                           if normalize_project(name) == normalize_project(config.project)]
+                if len(matches) > 1:
+                    raise ChatFijoError("Hay claves duplicadas para este proyecto; no se sobrescribió la URL.")
+                if matches:
+                    name, old = matches[0]
+                    old = (old or "").strip()
+                    expected = config.url
+                    if old.rstrip("/") == HOME:
+                        old = ""
+                    if old != expected and old != url:
+                        raise ChatFijoError("La URL cambió en otro proceso; se conserva sin sobrescribirla.")
+                    db.execute("UPDATE config_chats SET url=? WHERE proyecto=?", (url, name))
+                else:
+                    if config.url:
+                        raise ChatFijoError("El proyecto cambió en otro proceso; no se recreó su registro.")
+                    db.execute("INSERT INTO config_chats(proyecto,url) VALUES (?,?)", (config.project, url))
+    except sqlite3.Error as exc:
+        raise ChatFijoError(f"No se pudo guardar la nueva URL del chat: {exc}. No se reenvió el mensaje.") from exc
+    return ChatConfig(config.project, url, False, config.database)
 
 
 def check_port(timeout: float = 3) -> None:
@@ -111,11 +147,11 @@ def check_port(timeout: float = 3) -> None:
 
 
 @contextmanager
-def chat_lock(url: str):
+def chat_lock(project: str):
     """El sistema operativo libera el bloqueo aunque el proceso muera."""
     folder = ROOT / ".sync-local" / "chat-fijo"
     folder.mkdir(parents=True, exist_ok=True)
-    key = hashlib.sha256(repr(chat_identity(url)).encode()).hexdigest()[:24]
+    key = hashlib.sha256(normalize_project(project).encode()).hexdigest()[:24]
     with (folder / (key + ".lock")).open("a+b") as handle:
         handle.seek(0, 2)
         if handle.tell() == 0:
@@ -188,6 +224,8 @@ class GeminiChat:
         self.runtime = self.browser = self.page = None
         self.web_model = "no seleccionado (preparación pendiente)"
         self.model_note = ""
+        self.creating = not bool(config.url)
+        self.message_sent = False
 
     def __enter__(self):
         check_port(min(self.connect_timeout, 3))
@@ -215,7 +253,7 @@ class GeminiChat:
             self.runtime = None
 
     def check(self) -> dict:
-        target = chat_identity(self.config.url)
+        target = chat_identity(self.config.url) if self.config.url else None
         found = False
         for context in self.browser.contexts:
             for page in context.pages:
@@ -228,11 +266,11 @@ class GeminiChat:
                 "contexts": len(self.browser.contexts), "message_sent": False}
 
     def prepare(self):
-        target = chat_identity(self.config.url)
+        target = chat_identity(self.config.url) if self.config.url else None
         for context in self.browser.contexts:
             for page in context.pages:
                 try:
-                    if chat_identity(page.url) == target:
+                    if target is not None and chat_identity(page.url) == target:
                         self.page = page
                         break
                 except (ChatFijoError, ValueError):
@@ -241,20 +279,40 @@ class GeminiChat:
                 break
         if self.page is None:
             self.page = self.browser.contexts[0].new_page()
-            self.page.goto(self.config.url, wait_until="domcontentloaded", timeout=20000)
+            self.page.goto(self.config.url or HOME, wait_until="domcontentloaded", timeout=20000)
         self.page.set_default_timeout(10000)
         self.wait_ready()
 
     def ensure_target(self):
+        parsed = urlsplit(self.page.url)
+        if parsed.hostname == "accounts.google.com":
+            raise ChatFijoError("Falta iniciar sesión de Google en la ventana abierta; no se envió otra consulta.")
+        at_home = (parsed.scheme == "https" and parsed.hostname == "gemini.google.com"
+                   and parsed.path.rstrip("/") == "/app"
+                   and not parsed.username and not parsed.password and parsed.port in (None, 443))
+        if at_home and (self.creating or not self.message_sent):
+            self.creating = True
+            return
         try:
-            matches = chat_identity(self.page.url) == chat_identity(self.config.url)
+            current = chat_identity(self.page.url)
+            if self.creating and self.message_sent:
+                return  # El chat recién creado recibe su ID después del envío.
+            matches = bool(self.config.url) and current == chat_identity(self.config.url)
         except (ChatFijoError, ValueError):
             matches = False
         if not matches:
-            host = urlsplit(self.page.url).hostname
-            if host == "accounts.google.com":
-                raise ChatFijoError("Falta iniciar sesión de Google en la ventana abierta; no se envió el mensaje.")
-            raise ChatFijoError("La URL fija redirigió fuera del chat configurado; verificá que esta cuenta tenga acceso a DOS_AGENTES. No se envió el mensaje.")
+            raise ChatFijoError("Gemini navegó fuera del chat esperado; se detuvo sin reenviar el mensaje.")
+
+    def capture_chat(self) -> bool:
+        if not self.creating:
+            return True
+        try:
+            chat_identity(self.page.url)
+        except (ChatFijoError, ValueError):
+            return False
+        self.config = save_chat(self.config, self.page.url)
+        self.creating = False
+        return True
 
     def generating(self) -> bool:
         return self.page.evaluate(GENERATION_JS)
@@ -328,6 +386,7 @@ class GeminiChat:
     def ask(self, prompt: str, timeout: float = 180) -> str:
         if not prompt.strip():
             raise ChatFijoError("El mensaje no puede estar vacío.")
+        self.message_sent = False
         if self.page is None:
             self.prepare()
         else:
@@ -343,13 +402,16 @@ class GeminiChat:
             raise ChatFijoError("Hay un borrador en el editor; se conserva sin sobrescribirlo.")
         tracker = ResponseTracker(self.page.evaluate(SNAPSHOT_JS))
         editor.fill(prompt)
+        self.message_sent = True  # Incluso si el clic falla, nunca repetir automáticamente.
         self.page.locator(SEND).first.click(timeout=10000)
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             self.ensure_target()
+            # Guardar el ID apenas aparece evita perder el chat si la respuesta tarda.
+            self.capture_chat()
             answer = tracker.observe(self.page.evaluate(SNAPSHOT_JS),
                                      self.generating(), time.monotonic())
-            if answer is not None:
+            if answer is not None and not self.creating:
                 return answer
             self.page.wait_for_timeout(500)
         raise ChatFijoError("Tiempo agotado esperando la respuesta completa de Gemini. No se reenvió el mensaje; revisá la pestaña antes de reintentar.")
@@ -373,12 +435,12 @@ def main(argv=None) -> int:
                 print(json.dumps(chat.check(), ensure_ascii=False))
         else:
             message = args.message if args.message is not None else sys.stdin.read()
-            with chat_lock(config.url), GeminiChat(config, args.connect_timeout) as chat:
+            with chat_lock(config.project), GeminiChat(resolve_chat(args.project), args.connect_timeout) as chat:
                 try:
                     answer = chat.ask(message, args.timeout)
                     if args.json_result:
                         print(json.dumps({"model": chat.web_model, "response": answer,
-                                          "note": chat.model_note}, ensure_ascii=False))
+                                          "url": chat.config.url, "note": chat.model_note}, ensure_ascii=False))
                     else:
                         print(answer)
                 finally:
