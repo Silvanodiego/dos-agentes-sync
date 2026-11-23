@@ -54,6 +54,15 @@ automáticamente el mensaje: revisá primero la pestaña y el avance guardado.
 - Cuando uses Chat Fijo Gemini, indicalo al cierre como: `[Chat Fijo Gemini: consultado (<proyecto>)]`.
 - Esta regla no amplía la autorización del usuario ni las capacidades disponibles. Se mantienen la protección de credenciales y la prohibición de reenviar automáticamente una generación fallida.
 
+## PROHIBIDO CERRAR SOLO CON DIAGNÓSTICO
+
+- Nunca termines una respuesta diciendo solo qué falló o qué quedó incompleto.
+- Si te trabás o decidís frenar por riesgo (hardware, permisos, red, datos), primero consultá a Chat Fijo Gemini (chat_fijo_gemini.py) para definir el plan B.
+- Si igual tenés que frenar para que decida el usuario, cerrá SIEMPRE con:
+  1. Causa probable en 1 línea.
+  2. La solución técnica recomendada (con el comando o paso exacto listo para ejecutar).
+  3. Una alternativa si esa no aplica.
+
 ## Sincronizacion obligatoria
 
 Cada vez que modifiques cualquier archivo en C:\dos_agentes_local\ o en config_compartida\, al terminar la tarea ejecutá automáticamente git add, git commit con un mensaje breve y git push.

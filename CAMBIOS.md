@@ -277,3 +277,9 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - El entorno del subproceso del piloto fuerza PYTHONIOENCODING=utf-8 y conserva el entorno del sistema.
 - Pruebas nuevas: salida de emojis/acentos desde consola cp1252 en ambos modulos, captura sin reconfigure y herencia UTF-8/lectura de salida del piloto. Los 24 tests de test_chat_fijo_gemini.py pasan sin acceder al chat ni ejecutar Codex real.
 - Verificados por SHA256 bridge_server.py y ocho scripts/archivos de respaldo: sin cambios.
+
+# 2026-11-23 - Prohibido cerrar solo con diagnostico
+
+- Agregada la regla obligatoria en config_compartida/AGENTS.md y sincronizada en AGENTS.md local y %USERPROFILE%/.codex/AGENTS.md.
+- Ante bloqueo o riesgo, consultar al Chat Fijo Gemini para definir plan B; si hace falta decision del usuario, informar causa probable, solucion tecnica con comando/paso exacto y alternativa.
+- Verificadas las tres copias identicas y SHA256 de bridge_server.py y respaldos sin cambios.
