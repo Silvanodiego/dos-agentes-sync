@@ -1,0 +1,1 @@
+{"name":"dos-agentes-herramientas","version":"1.0.0","private":true,"devDependencies":{"@biomejs/biome":"^2.6.4","@modelcontextprotocol/server-filesystem":"^2026.8.31","@modelcontextprotocol/server-memory":"^2.0.1","pm2":"^7.1.1","promptfoo":"^0.125.1","repomix":"^1.18.1"},"dependencies":{"@whiskeysockets/baileys":"^7.0.0-rc14"}}

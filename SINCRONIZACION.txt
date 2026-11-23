@@ -1,0 +1,38 @@
+PC 1: repositorio local C:\dos_agentes_local, rama main.
+Versionados: fuentes, scripts, manifiestos y config_compartida.
+Excluidos: credenciales, bases, sesiones, ejecutables, entornos, caches, trabajos,
+estados y archivos de datos no permitidos por .gitignore. repos_referencia es local.
+
+Arranque: pull --ff-only acotado en tiempo; continua sin Internet.
+DosAgentesGitSync: add/commit, pull --rebase --autostash y push cada 10 minutos
+mientras la sesion del usuario esta iniciada. Conflictos se conservan y registran
+para resolver una vez; no se fuerza ni se descarta contenido.
+Sin origin los commits son locales; subidas pendientes se reintentan.
+
+AGENTS.md y agy.bat compartidos se copian al perfil activo. El AGENTS.md de la
+raiz es generado y esta excluido de Git. config.toml es solo una plantilla:
+expandir %USERPROFILE% al aplicarla; TOML no expande variables por si mismo.
+La configuracion activa y las credenciales permanecen en cada PC.
+
+Dependencias: compara hashes de requirements.txt y package.json. Instala solo
+paquetes ausentes; Python conserva versiones con constraints; npm usa staging
+y copia paquetes nuevos sin reemplazar existentes. Cambios de version necesitan
+mantenimiento explicito. Los fallos se reintentan al ejecutar nuevamente.
+Logs: .sync-local\sync.log, launcher.log. Backup del Registro: .sync-local\backups.
+
+GITHUB: crear dos-agentes-sync PRIVADO y VACIO (sin README/licencia).
+En PowerShell, reemplazar TU_USUARIO por el usuario real de GitHub:
+git.exe -C C:\dos_agentes_local remote add origin https://github.com/TU_USUARIO/dos-agentes-sync.git
+git.exe -C C:\dos_agentes_local push -u origin main
+La autenticacion de GitHub es propia de cada PC y no se copia por Git.
+
+PC 2 Y PC 3: requiere Git, Python 3 con py, Node.js/npm y credenciales propias:
+git.exe clone https://github.com/TU_USUARIO/dos-agentes-sync.git C:\dos_agentes_local
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\dos_agentes_local\scripts\instalar_sync.ps1
+C:\dos_agentes_local\sync_y_arrancar.bat
+Instalar y autorizar Antigravity Manager en cada PC. No copiar autenticaciones.
+
+Identidad Git inicial local: usuario de Windows @ nombre-de-PC.local;
+personalizar con git config user.name y git config user.email.
+Documentacion: https://git-scm.com/docs/git-pull
+Documentacion npm: https://docs.npmjs.com/cli/v11/commands/npm-install/

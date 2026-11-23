@@ -1,0 +1,19 @@
+# Plantilla portatil: no reemplaza automaticamente el config.toml activo.
+# %USERPROFILE% es un marcador; expandirlo antes de instalar esta plantilla.
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+model = "gpt-6.1-sol"
+model_reasoning_effort = "medium"
+
+[windows]
+sandbox = "unelevated"
+
+[projects.'C:\dos_agentes_local']
+trust_level = "trusted"
+
+[sandbox_workspace_write]
+writable_roots = ['C:\dos_agentes_local', '%USERPROFILE%\ScriptsGlobales']
+network_access = true
+
+# Configuracion de MCP, plugins y rutas de la aplicacion: propia de cada PC.
+# No copiar auth.json, tokens, sesiones ni rutas versionadas de WindowsApps.
