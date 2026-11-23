@@ -18,9 +18,10 @@ Antigravity Manager: instalador oficial NSIS resuelto desde releases/latest
 de Draculabo/AntigravityManager, con comprobacion SHA256 de GitHub. No se usan
 URLs inventadas de una version fija. El programa se instala en AntigravityManager.
 La PC 3 obtiene claves locales nuevas; hay que volver a autenticar las cuentas
-en Antigravity Manager, Codex y Gemini (las credenciales DPAPI no son portables).
-El monitor muestra cuota solo despues de cargar localmente auth_c1.json y
-auth_c2.json de las cuentas autenticadas en esa PC; no vienen dentro de este ZIP.
+en Antigravity Manager y Gemini (las credenciales DPAPI no son portables).
+Incluye las exportaciones Codex auth_c1.json y auth_c2.json solicitadas para
+el monitor. Si no existe auth.json en el usuario destino, se crea desde auth_c1.
+Si la sesion Codex expiro, volver a autenticar esa cuenta.
 
 La plantilla TOML contiene %USERPROFILE%: el instalador expande los valores
 parseados y escribe rutas reales del usuario nuevo, porque TOML no expande
@@ -40,7 +41,8 @@ AntigravityManagerProxy se registra en HKCU\Software\Microsoft\Windows\CurrentVe
 El inicio inmediato usa los servicios locales y no espera una inferencia.
 
 No incluye bases, logs, node_modules, entornos virtuales, perfiles Chrome,
-auth.json, auth_c1/c2.json, tokens ni cuentas de Antigravity. Dependencias
+auth.json ni tokens o cuentas de Antigravity. Las dos exportaciones Codex
+auth_c1/c2.json quedan fuera de Git. Dependencias
 de runtime se reconstruyen durante la instalacion. Backups locales no se modifican.
 En una reinstalacion un script protegido diferente hace detener la copia antes
 de sobrescribir bridge_server.py, consultar_gemini.py o bucle_autonomo.py.

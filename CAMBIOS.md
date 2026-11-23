@@ -11,7 +11,9 @@
 - `scripts/configurar_pc3.py` expande USERPROFILE despues de parsear TOML,
   conserva notify y MCPs existentes, rechaza duplicados y habilita
   antigravity_bridge. Prepara AGENTS Cascada AG, adaptadores y bases nuevas
-  con solo esquemas. No importa cuentas, perfiles ni credenciales.
+  con solo esquemas. No importa cuentas ni credenciales Antigravity o perfiles.
+  Se incluyen las exportaciones Codex auth_c1/c2 solicitadas, fuera de Git;
+  el auth.json activo se crea en destino desde cuenta 1 solo si no existe.
 - Startup usa arrancar_todo_oculto.vbs; DosAgentesGitSync registra el flujo
   auto_sync_git oculto cada diez minutos. En PC 1 ambos ya estaban correctos:
   se verificaron sin recrearlos ni reiniciar servicios.
@@ -19,7 +21,7 @@
   admiten DOS_AGENTES_ROOT; el MCP esta habilitado en la plantilla compartida.
 - `scripts/crear_paquete_pc3.py` exporta fuentes versionadas y genera v5 con
   manifiesto, hashes, validacion batch y exclusion de DB/logs/cache/venv,
-  node_modules, auth, perfiles Chrome y credenciales Antigravity. Copias
+  node_modules, auth.json, perfiles Chrome y credenciales Antigravity. Copias
   identicas en Escritorio y Drive. LEEME_PC3_v5.md documenta autenticaciones.
 - Pruebas: TOML portable y fusion conservadora, rechazo de notify duplicado,
   idempotencia y preservacion de DB/token existentes, exclusiones, lockfile,

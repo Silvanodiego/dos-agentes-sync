@@ -155,8 +155,8 @@ try {
     Run $py @('scripts\configurar_pc3.py','--root',$Destino,'--home',$env:USERPROFILE,'--iniciar')
     Start-Process -FilePath "$env:WINDIR\System32\wscript.exe" -ArgumentList ('//B //Nologo "' + (Join-Path $Destino 'abrir_chrome_gemini_oculto.bat') + '"') -WindowStyle Hidden | Out-Null
     Write-Host 'INSTALACION COMPLETA - v5' -ForegroundColor Green
-    Write-Host 'Debe iniciar sesion en Codex, Antigravity Manager y Gemini. No se migraron credenciales ni perfiles DPAPI.' -ForegroundColor Yellow
-    Write-Host 'Para Gemini: abrir_chrome_gemini.bat. Para rotacion: importar auth_c1.json/auth_c2.json localmente despues de autenticar cada cuenta.'
+    Write-Host 'Debe volver a autenticar las cuentas en Antigravity Manager y Gemini: no se migraron credenciales ni perfiles DPAPI.' -ForegroundColor Yellow
+    Write-Host 'Codex usa la exportacion auth_c1.json si no existia auth.json. Si expiro su sesion, vuelva a iniciar sesion. Gemini: abrir_chrome_gemini.bat.'
     exit 0
 } catch {
     Write-Host ("ERROR: " + $_.Exception.Message) -ForegroundColor Red

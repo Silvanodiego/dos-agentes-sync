@@ -31,6 +31,9 @@ def allowed(relative):
     if forbidden_dirs.intersection(parts):
         return False
     name = parts[-1]
+    # Exportaciones Codex solicitadas para migrar; nunca se agregan a Git.
+    if len(parts) == 1 and name in ('auth_c1.json', 'auth_c2.json'):
+        return True
     patterns = ('*.db', '*.db-*', '*.sqlite*', '*.log', '*.jsonl', '*.pyc', '*.bak',
                 '*_bak_*', '*_backup*', 'auth*.json', '*credentials*', '*token*.json',
                 'local_bridge_token', '.env', '*.pem', '*.key', '*.zip')
@@ -41,6 +44,10 @@ def build(desktop: Path, drive: Path):
     protected = {name: sha(ROOT / name) for name in PROTECTED}
     paths = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode('utf-8').split('\0')
     sources = sorted(set(p for p in paths if p and allowed(p)))
+    for name in ('auth_c1.json', 'auth_c2.json'):
+        if not (ROOT / name).is_file():
+            raise RuntimeError('Falta la exportacion solicitada: ' + name)
+        sources.append(name)
     if any(not (ROOT / p).is_file() for p in sources):
         raise RuntimeError('Hay fuentes Git faltantes.')
     with tempfile.TemporaryDirectory(prefix='codex-v5-package-') as tmp:

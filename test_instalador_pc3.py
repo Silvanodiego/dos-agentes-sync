@@ -44,7 +44,12 @@ class InstallerTests(unittest.TestCase):
             base = Path(temporary)
             root, home = base / 'root', base / 'user'
             shutil.copytree(ROOT / 'config_compartida', root / 'config_compartida')
+            export = root / 'auth_c1.json'
+            export.write_text('{"fixture":"cuenta1"}', encoding='utf-8')
             setup.configure(root, home)
+            first_auth = (home / '.codex/auth.json').read_bytes()
+            self.assertEqual(first_auth, export.read_bytes())
+            export.write_text('{"fixture":"otra-sesion"}', encoding='utf-8')
             token = home / '.antigravity-agent/local_bridge_token'
             first_token = token.read_bytes()
             config = home / '.codex/config.toml'
@@ -55,18 +60,19 @@ class InstallerTests(unittest.TestCase):
             setup.configure(root, home)
             self.assertEqual(first_config, config.read_bytes())
             self.assertEqual(first_token, token.read_bytes())
+            self.assertEqual(first_auth, (home / '.codex/auth.json').read_bytes())
             with closing(sqlite3.connect(root / 'estado_puente.db')) as con:
                 self.assertEqual(con.execute('select count(*) from config_chats').fetchone()[0], 1)
 
     def test_package_excludes_private_and_runtime_files(self):
-        for path in ('auth.json', 'auth_c1.json', 'x/state.db', 'x/state.db-journal',
+        for path in ('auth.json', 'x/auth_c1.json', 'x/state.db', 'x/state.db-journal',
                      'logs/a.txt', 'node_modules/a.js', '.venv/Scripts/python.exe',
                      'chrome_gemini_profile/Default/Cookies', '.antigravity-agent/gui_config.json',
                      '__pycache__/test.pyc', 'config_backups/AGENTS.md', 'sesion.jsonl',
                      'script_bak_123.py'):
             with self.subTest(path=path):
                 self.assertFalse(package.allowed(path))
-        for path in ('bridge_server.py', 'config_compartida/config.toml', 'chat_fijo_gemini.py'):
+        for path in ('bridge_server.py', 'config_compartida/config.toml', 'chat_fijo_gemini.py', 'auth_c1.json', 'auth_c2.json'):
             self.assertTrue(package.allowed(path))
 
 

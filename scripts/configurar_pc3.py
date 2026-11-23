@@ -76,6 +76,9 @@ def configure(root: Path, home: Path):
     rules = (shared / 'AGENTS.md').read_bytes()
     (codex / 'AGENTS.md').write_bytes(rules)
     (root / 'AGENTS.md').write_bytes(rules)
+    # auth.json no viaja en el ZIP: se crea desde la exportacion de la cuenta 1.
+    if not (codex / 'auth.json').exists() and (root / 'auth_c1.json').is_file():
+        (codex / 'auth.json').write_bytes((root / 'auth_c1.json').read_bytes())
     scripts = home / 'ScriptsGlobales'
     scripts.mkdir(parents=True, exist_ok=True)
     for name in ('agy.bat', 'antigravity_mcp.bat'):
