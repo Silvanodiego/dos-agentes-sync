@@ -17,3 +17,10 @@ network_access = true
 
 # Configuracion de MCP, plugins y rutas de la aplicacion: propia de cada PC.
 # No copiar auth.json, tokens, sesiones ni rutas versionadas de WindowsApps.
+
+# cmd.exe expande USERPROFILE; el instalador tambien expande el marcador.
+[mcp_servers.antigravity_bridge]
+command = 'cmd.exe'
+args = ['/d', '/c', '"%USERPROFILE%\ScriptsGlobales\antigravity_mcp.bat"']
+startup_timeout_sec = 30
+tool_timeout_sec = 180
