@@ -13,6 +13,7 @@ import socket
 import sqlite3
 import sys
 import time
+import unicodedata
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent
@@ -20,7 +21,41 @@ DATABASE = ROOT / "estado_puente.db"
 ENDPOINT = "http://127.0.0.1:9222"
 EDITOR = 'rich-textarea [contenteditable="true"], [contenteditable="true"][role="textbox"], textarea[aria-label]'
 SEND = 'button.send-button:visible, button[aria-label="Send message"]:visible, button[aria-label="Enviar mensaje"]:visible'
-STOP = 'button[aria-label*="Stop response"], button[aria-label*="Detener respuesta"], button[aria-label*="Stop generating"], button[aria-label*="Detener generación"], button.stop-button, button[data-test-id="stop-button"]'
+
+# El filtro se aplica a aria-label, title y texto, nunca al nombre de la cuenta.
+GENERATION_JS = r"""() => {
+  const norm = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return [...document.querySelectorAll('button, [role="button"]')].some(b => {
+    if (!b.getClientRects().length || getComputedStyle(b).visibility === 'hidden') return false;
+    const label = norm([b.getAttribute('aria-label'), b.title, b.innerText].join(' '));
+    if (/audio|voz|voice|microfono|mic|escuchar|listen/.test(label)) return false;
+    return /detener (?:la )?(?:respuesta|generacion)|stop (?:response|generating|generation)/.test(label)
+      || b.matches('button.stop-button, button[data-test-id="stop-button"]');
+  });
+}"""
+
+
+def normalized(value: str) -> str:
+    return ''.join(c for c in unicodedata.normalize('NFD', value.lower())
+                   if unicodedata.category(c) != 'Mn')
+
+
+def model_priority(label: str) -> int:
+    text = normalized(label)
+    if re.search(r'\b(pro|ultra|advanced)\b', text):
+        return 3
+    if re.search(r'\b(thinking|razonamiento|pensamiento|pensar|neon)\b|analisis mas profundo', text):
+        return 2
+    if re.search(r'\b(fast|flash|rapido|hydrogen)\b|ayuda todos los dias', text):
+        return 1
+    return 0
+
+
+def model_available(label: str, disabled: bool = False) -> bool:
+    return not disabled and not re.search(
+        r'agotad|sin cuota|no disponible|unavailable|quota exceeded|out of quota|'
+        r'(?:limit|limite).*?(?:reached|alcanz)|alcanz.*?limite|'
+        r'upgrade|mejorar (?:el )?plan|suscrib|subscribe', normalized(label))
 
 
 class ChatFijoError(RuntimeError):
@@ -110,7 +145,7 @@ def chat_lock(url: str):
 SNAPSHOT_JS = """() => {
   window.__chatFijoNodes ??= new WeakMap();
   window.__chatFijoCounter ??= 0;
-  const nodes = [...document.querySelectorAll('model-response')];
+  const nodes = [...document.querySelectorAll('model-response, response-container')];
   const last = nodes.at(-1);
   if (!last) return {key: null, text: '', complete: false};
   if (!window.__chatFijoNodes.has(last))
@@ -134,16 +169,14 @@ class ResponseTracker:
         self.stable_seconds = stable_seconds
         self.last = None
         self.changed_at = None
-        self.saw_busy = False
 
     def observe(self, snapshot: dict, busy: bool, now: float) -> str | None:
-        self.saw_busy |= busy
         text = snapshot["text"].strip()
         fresh = (snapshot["key"] != self.baseline["key"] or text != self.baseline["text"])
         current = (snapshot["key"], text)
         if current != self.last or busy:
             self.last, self.changed_at = current, now
-        finished = not busy and (self.saw_busy or snapshot.get("complete", False))
+        finished = not busy
         if fresh and text and finished and now - self.changed_at >= self.stable_seconds:
             return text
         return None
@@ -153,6 +186,8 @@ class GeminiChat:
     def __init__(self, config: ChatConfig, connect_timeout: float = 5):
         self.config, self.connect_timeout = config, connect_timeout
         self.runtime = self.browser = self.page = None
+        self.web_model = "no seleccionado (preparación pendiente)"
+        self.model_note = ""
 
     def __enter__(self):
         check_port(min(self.connect_timeout, 3))
@@ -208,23 +243,101 @@ class GeminiChat:
             self.page = self.browser.contexts[0].new_page()
             self.page.goto(self.config.url, wait_until="domcontentloaded", timeout=20000)
         self.page.set_default_timeout(10000)
-        if chat_identity(self.page.url) != target:
-            raise ChatFijoError("Gemini redirigió a otro chat o al login; abrí la sesión del chat configurado.")
-        self.page.locator(EDITOR).first.wait_for(state="visible", timeout=15000)
-        if visible(self.page.locator(STOP)):
-            raise ChatFijoError("Gemini ya está generando. Se conserva esa respuesta sin enviar otra consulta.")
+        self.wait_ready()
+
+    def ensure_target(self):
+        try:
+            matches = chat_identity(self.page.url) == chat_identity(self.config.url)
+        except (ChatFijoError, ValueError):
+            matches = False
+        if not matches:
+            host = urlsplit(self.page.url).hostname
+            if host == "accounts.google.com":
+                raise ChatFijoError("Falta iniciar sesión de Google en la ventana abierta; no se envió el mensaje.")
+            raise ChatFijoError("La URL fija redirigió fuera del chat configurado; verificá que esta cuenta tenga acceso a DOS_AGENTES. No se envió el mensaje.")
+
+    def generating(self) -> bool:
+        return self.page.evaluate(GENERATION_JS)
+
+    def ready_editor(self):
+        from playwright.sync_api import expect
+        self.ensure_target()
+        editor = self.page.locator(', '.join(part.strip() + ':visible' for part in EDITOR.split(','))).first
+        expect(editor).to_be_visible(timeout=15000)
+        expect(editor).to_be_enabled(timeout=10000)
+        expect(editor).to_be_editable(timeout=10000)
+        return editor
+
+    def wait_ready(self):
+        from playwright.sync_api import TimeoutError as PlaywrightTimeout
+        self.page.wait_for_load_state("domcontentloaded", timeout=15000)
+        try:
+            self.page.wait_for_load_state("networkidle", timeout=5000)
+        except PlaywrightTimeout:
+            # Gemini mantiene conexiones: exigir además editor y ausencia de STOP.
+            self.model_note = "networkidle agotó 5 s; se validó el editor y la generación"
+        self.ready_editor()
+        deadline = time.monotonic() + 15
+        while self.generating():
+            if time.monotonic() >= deadline:
+                raise ChatFijoError("Gemini sigue generando; no se envió ni se canceló ninguna consulta.")
+            self.page.wait_for_timeout(250)
+
+    def select_best_model(self):
+        """Solo interactúa con el menú de modelos; nunca suscripciones ni compras."""
+        trigger = None
+        for control in self.page.locator('button, [role="button"], [role="combobox"]').all():
+            if not control.is_visible():
+                continue
+            metadata = control.evaluate("e => ({text:e.innerText, label:e.getAttribute('aria-label')||'', test:e.getAttribute('data-test-id')||'', cls:e.className||''})")
+            name = metadata['text'].strip() or metadata['label']
+            identity = normalized(metadata['test'] + ' ' + metadata['cls'] + ' ' + metadata['label'])
+            if (re.search(r'model.selector|mode.menu|mode.picker|bard.mode|input.area.switch|selector.*modelo|seleccionar.*modelo', identity)
+                    or (len(name) < 90 and model_priority(name) > 0
+                        and not re.search(r'upgrade|suscrib|prueba', normalized(name)))):
+                trigger = control
+                self.web_model = name
+                break
+        if trigger is None:
+            self.web_model = "no identificado (selector ausente)"
+            return
+        trigger.click(timeout=5000)
+        options = self.page.locator('[role="menuitem"], [role="menuitemradio"], [role="option"], .mat-mdc-menu-content button')
+        deadline = time.monotonic() + 3
+        while not visible(options) and time.monotonic() < deadline:
+            self.page.wait_for_timeout(100)
+        ranked = []
+        for index, option in enumerate(options.all()):
+            if not option.is_visible():
+                continue
+            label = option.inner_text().strip() or option.get_attribute('aria-label') or ''
+            disabled = not option.is_enabled() or option.get_attribute('aria-disabled') == 'true'
+            if label and model_available(label, disabled):
+                ranked.append((model_priority(label), -index, label, option))
+        if not ranked:
+            self.page.keyboard.press('Escape')
+            raise ChatFijoError("El selector de modelos no ofreció opciones habilitadas verificables; no se envió el mensaje.")
+        _, _, label, option = max(ranked, key=lambda item: item[:2])
+        option.click(timeout=5000)
+        self.page.wait_for_timeout(300)
+        selected = trigger.inner_text().strip() or trigger.get_attribute('aria-label') or ''
+        if not selected or (model_priority(label) and model_priority(selected) != model_priority(label)):
+            raise ChatFijoError("No se pudo confirmar el modelo seleccionado; no se envió el mensaje.")
+        self.web_model = selected
 
     def ask(self, prompt: str, timeout: float = 180) -> str:
         if not prompt.strip():
             raise ChatFijoError("El mensaje no puede estar vacío.")
         if self.page is None:
             self.prepare()
-        target = chat_identity(self.config.url)
-        if chat_identity(self.page.url) != target:
-            raise ChatFijoError("La pestaña cambió de chat; no se envió el mensaje.")
-        if visible(self.page.locator(STOP)):
-            raise ChatFijoError("El chat ya está generando una respuesta.")
-        editor = self.page.locator(EDITOR).first
+        else:
+            self.wait_ready()
+        self.select_best_model()
+        self.ready_editor()
+        self.page.wait_for_timeout(2000)
+        editor = self.ready_editor()
+        if self.generating():
+            raise ChatFijoError("El chat empezó otra generación durante la estabilización; no se envió el mensaje.")
         draft = editor.inner_text() if editor.get_attribute("contenteditable") else editor.input_value()
         if draft.strip():
             raise ChatFijoError("Hay un borrador en el editor; se conserva sin sobrescribirlo.")
@@ -233,10 +346,9 @@ class GeminiChat:
         self.page.locator(SEND).first.click(timeout=10000)
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            if chat_identity(self.page.url) != target:
-                raise ChatFijoError("La pestaña cambió de chat durante la respuesta.")
+            self.ensure_target()
             answer = tracker.observe(self.page.evaluate(SNAPSHOT_JS),
-                                     visible(self.page.locator(STOP)), time.monotonic())
+                                     self.generating(), time.monotonic())
             if answer is not None:
                 return answer
             self.page.wait_for_timeout(500)
@@ -248,6 +360,7 @@ def main(argv=None) -> int:
     parser.add_argument("--project", default="DOS_AGENTES")
     parser.add_argument("--message", help="Si falta, se lee de stdin; no se usa con --check")
     parser.add_argument("--check", action="store_true", help="Solo conecta a CDP; no abre pestañas ni envía mensajes")
+    parser.add_argument("--json-result", action="store_true", help="Devuelve modelo web y respuesta en JSON")
     parser.add_argument("--timeout", type=float, default=180)
     parser.add_argument("--connect-timeout", type=float, default=5)
     args = parser.parse_args(argv)
@@ -261,7 +374,15 @@ def main(argv=None) -> int:
         else:
             message = args.message if args.message is not None else sys.stdin.read()
             with chat_lock(config.url), GeminiChat(config, args.connect_timeout) as chat:
-                print(chat.ask(message, args.timeout))
+                try:
+                    answer = chat.ask(message, args.timeout)
+                    if args.json_result:
+                        print(json.dumps({"model": chat.web_model, "response": answer,
+                                          "note": chat.model_note}, ensure_ascii=False))
+                    else:
+                        print(answer)
+                finally:
+                    print("MODELO_WEB: " + chat.web_model, file=sys.stderr)
         return 0
     except (ChatFijoError, ValueError) as exc:
         print("ERROR_CHAT_FIJO: " + str(exc), file=sys.stderr)

@@ -78,11 +78,30 @@ class ResponseTests(unittest.TestCase):
         self.assertIsNone(tracker.observe(new, False, 6))
         self.assertEqual(tracker.observe(new, False, 7), "respuesta completa")
 
-    def test_no_completion_hint_no_early_return(self):
+    def test_stable_new_text_without_copy_button(self):
         tracker = self.tracker()
         new = {"key": 2, "text": "respuesta", "complete": False}
         tracker.observe(new, False, 0)
-        self.assertIsNone(tracker.observe(new, False, 100))
+        self.assertIsNone(tracker.observe(new, False, 2.9))
+        self.assertEqual(tracker.observe(new, False, 3), "respuesta")
+
+
+class ModelTests(unittest.TestCase):
+    def test_priority_and_quota_fallback(self):
+        options = [("Pro - límite alcanzado", False), ("Thinking", False), ("Fast", False)]
+        available = [name for name, disabled in options if chat.model_available(name, disabled)]
+        self.assertEqual(max(available, key=chat.model_priority), "Thinking")
+        self.assertGreater(chat.model_priority("Pro"), chat.model_priority("Thinking"))
+        self.assertGreater(chat.model_priority("Thinking"), chat.model_priority("Rápido"))
+        self.assertGreater(chat.model_priority("Análisis más profundo\n4 Neon"),
+                           chat.model_priority("Ayuda todos los días\n4 Hydrogen"))
+
+    def test_disabled_and_exhausted_options_are_excluded(self):
+        for label, disabled in [("Pro", True), ("Pro sin cuota", False),
+                                ("Pro quota exceeded", False), ("Thinking no disponible", False),
+                                ("Upgrade to Pro", False)]:
+            with self.subTest(label=label):
+                self.assertFalse(chat.model_available(label, disabled))
 
 
 class PilotTests(unittest.TestCase):

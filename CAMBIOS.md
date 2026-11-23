@@ -103,3 +103,46 @@ Referencia técnica: [Playwright Python — Browser y conexión CDP](https://pla
   el inicio de sesión. No se afirma que se haya abierto una ventana.
 - Se verifica el hash SHA256 original de `bridge_server.py` y su diff vacío
   antes del commit. Solo se incluyen el BAT nuevo, `.gitignore` y este registro.
+
+
+## 2026-11-23 — Carga, STOP, modelos web y arranque condicional
+
+- **`chat_fijo_gemini.py`:** espera `domcontentloaded` y hasta 5 segundos de
+  `networkidle` (si la red persistente impide ese estado, exige editor visible,
+  habilitado y editable y ausencia de generación). Espera hasta 15 segundos una
+  generación anterior, sin cancelarla; estabiliza 2 segundos antes de escribir y
+  vuelve a validar editor, URL y STOP. Conserva borradores y no reenvía errores.
+- STOP revisa aria-label, title y texto, excluyendo audio, voz, voice, micrófono,
+  mic, escuchar y listen. Solo devuelve texto de una respuesta nueva con STOP
+  ausente y contenido estable durante al menos 3 segundos, sin exigir botón copiar.
+- Abre el selector web si existe y prioriza Pro/Ultra/Advanced, luego Thinking o
+  Análisis más profundo/4 Neon, luego Fast/Flash/Rápido o Ayuda todos los días/4
+  Hydrogen; descarta opciones deshabilitadas, agotadas o de suscripción.
+  Si los nombres son desconocidos, conserva el orden del menú disponible.
+  Confirma la etiqueta seleccionada. `--json-result` agrega modelo y notas al
+  resultado; stderr informa MODELO_WEB también ante errores. No fuerza modelos
+  de Cascada AG ni promete disponibilidad posterior al envío.
+- **`sync_y_arrancar.bat`:** chequeo TCP de 1 segundo; llama al lanzador Gemini
+  únicamente si 127.0.0.1:9222 no escucha y conserva el arranque del sincronizador.
+- **`scripts/sync_silencioso.vbs`:** el modo startup ahora ejecuta ese BAT sin
+  ventana. La entrada existente DosAgentesSync del Registro ya usa este VBS;
+  el modo periódico conserva su comando anterior. No se relanzaron servicios.
+- **`test_chat_fijo_gemini.py`:** 17 pruebas aprobadas: incluyen estabilidad sin
+  botón copiar y selección por prioridad/cuota. Pruebas DOM separadas contra el
+  navegador existente: 10 casos STOP/audio/oculto y menú sintético que descarta
+  Pro agotado y selecciona Análisis más profundo; todos aprobados. El VBS se
+  verificó sustituyendo temporalmente Run por Echo en un archivo local ignorado;
+  el chequeo TCP omite Chrome con 9222 abierto y detecta un puerto cerrado.
+- Prueba real solicitada contra DOS_AGENTES con el mensaje exacto
+  `Prueba de conexión desde Chat Fijo Gemini. Respondé solo: CONEXION_OK`:
+  CDP 9222 respondió. La URL guardada sigue siendo
+  `https://gemini.google.com/app/ebb372bdb46e6358?hl=es_419`, pero Gemini la
+  redirige a `/app`. Se detuvo antes de seleccionar modelo o enviar el mensaje;
+  no hubo respuesta de Gemini ni se sustituyó la URL de config_chats. No se
+  atribuye la redirección a una causa no verificada. La prueba anterior a estos
+  parches sí envió el mensaje y agotó 120 segundos; no se reenvió automáticamente.
+- Diff vacío y SHA256 original conservado en `bridge_server.py`,
+  `consultar_gemini.py` y `bucle_autonomo.py`. Sin cambios al MCP ni a las reglas.
+
+Referencia: [Playwright — estados de carga](https://playwright.dev/python/docs/api/class-page#page-wait-for-load-state)
+y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
