@@ -246,3 +246,19 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
   próximo inicio, sin cerrar la sesión existente durante las pruebas.
 - `bridge_server.py`, `consultar_gemini.py` y `bucle_autonomo.py` mantienen sus
   hashes originales y diff vacío; no se modificó el MCP ni Cascada AG.
+# 2026-11-23 - Correccion de alcance del paquete v5 completo
+
+- Recuperado el ecosistema omitido de v4: cinco repos Git con bundles,
+  skills propias y actuales, plugins y marketplaces, ScriptsGlobales/modulos_enjambre,
+  CLI agy, herramientas .bin y configuraciones sin credenciales.
+- Nuevo ensamblador con inventario por componente, plantilla TOML completa portable
+  y validacion obligatoria de grupos. Antigravity Manager 0.30.0 incluido como
+  NSIS oficial SHA256 verificado, sin copiar node_modules sueltos.
+- Instalador restaura el ecosistema, importa .git sin requerir login para el
+  primer clon, instala token-saver local y globales npm, y verifica SQLite nativo.
+  Carga VCTools/SDK para reintento, conserva progreso visible y fix 404.
+- Se mantienen Cascada AG, Chat Fijo Gemini, inicio oculto y tarea de diez minutos.
+  No se modificaron bridge_server.py, consultar_gemini.py, bucle_autonomo.py ni respaldos.
+- Pruebas: TOML completo y merge sin notify duplicado, exclusiones, bases nuevas
+  sin datos privados y preservacion de sesiones existentes; sintaxis Python/PowerShell/JS.
+

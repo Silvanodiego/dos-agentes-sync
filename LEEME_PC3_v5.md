@@ -3,20 +3,23 @@
 Extraer la carpeta completa en una ruta local y ejecutar instalar.bat.
 El instalador muestra seis etapas en vivo, valida SHA256 antes de instalar,
 solicita Administrador, instala requisitos faltantes y prepara C:\dos_agentes_local.
-Necesita Internet, winget (App Installer de Microsoft) y acceso al repositorio
-https://github.com/Silvanodiego/dos-agentes-sync.git, rama main.
-Si el repositorio requiere autenticacion, iniciar sesion con Git Credential Manager.
+Necesita Internet y winget (App Installer de Microsoft). Incluye bundles Git
+del repositorio principal main y cinco repositorios de referencia para el primer clon.
+Para sincronizar despues con https://github.com/Silvanodiego/dos-agentes-sync.git,
+si el repositorio requiere autenticacion, iniciar sesion con Git Credential Manager.
 No se transfieren credenciales de GitHub en el paquete.
 
 Python 3.11-3.14, Git y Node.js LTS 24; pip instala los tres requirements.
 npm ci respeta package-lock.json. Ante un fallo instala VCTools/Windows SDK
 y reintenta una vez. Los errores finales son visibles y no se anuncian como exito.
-No se instala token-saver desde PyPI. Codex CLI se instala con npm si falta.
-Codex Desktop se instala por separado desde Microsoft Store si se quiere su GUI.
+Token-saver se instala desde repos_referencia/token-saver, sin buscarlo en PyPI.
+Instala tambien los globales npm de PC1: Codex CLI, context-mode, ctx7 y opencode-ai.
+Verifica better-sqlite3 abriendo una base en memoria. Codex Desktop se instala
+desde Microsoft Store si falta; se detecta su runtime antes de generar el TOML.
 
-Antigravity Manager: instalador oficial NSIS resuelto desde releases/latest
-de Draculabo/AntigravityManager, con comprobacion SHA256 de GitHub. No se usan
-URLs inventadas de una version fija. El programa se instala en AntigravityManager.
+Antigravity Manager: instalador oficial NSIS 0.30.0 x64 incluido, misma version
+que PC1, con SHA256 contrastado contra la release oficial de Draculabo.
+No depende de una descarga durante la instalacion. Se instala en AntigravityManager.
 La PC 3 obtiene claves locales nuevas; hay que volver a autenticar las cuentas
 en Antigravity Manager y Gemini (las credenciales DPAPI no son portables).
 Incluye las exportaciones Codex auth_c1.json y auth_c2.json solicitadas para
@@ -33,6 +36,11 @@ Chat Fijo Gemini: chat_fijo_gemini.py + piloto_gemini.py -> Chrome/Edge CDP 9222
 separado de Cascada AG. Abrir abrir_chrome_gemini.bat para autenticar Gemini.
 Se crean bases vacias a partir del esquema, sin historial ni URL de chats privados.
 El panel escucha en 8787. ScriptsGlobales recibe agy.bat y antigravity_mcp.bat.
+Ademas se restauran skills, plugins, marketplaces, modulos_enjambre,
+puente_gemini, CLI agy y herramientas binarias. INVENTARIO_ECOSISTEMA.json
+resume los grupos; MANIFIESTO_SHA256.json enumera todos los archivos y hashes.
+Los MCP de proyectos externos no incluidos se conservan como referencia;
+Patitas, MISC y Unity no se copian ni se activan sin sus proyectos originales.
 
 Inicio: DosAgentesInicioOculto.lnk ejecuta arrancar_todo_oculto.vbs mediante
 wscript; tarea DosAgentesGitSync (auto_sync_git) cada diez minutos, oculta,

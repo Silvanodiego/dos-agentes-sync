@@ -34,6 +34,9 @@ function Check-Package {
     foreach ($required in @('arrancar_todo_oculto.vbs','chat_fijo_gemini.py','piloto_gemini.py','abrir_chrome_gemini.bat','abrir_chrome_gemini_oculto.bat','config_compartida\AGENTS.md','config_compartida\config.toml','scripts\configurar_pc3.py','package-lock.json')) {
         if (!(Test-Path -LiteralPath (Join-Path $source $required))) { throw "Falta componente: $required" }
     }
+    foreach ($group in @('codex\skills','codex\plugins','codex\marketplaces','repos_referencia\token-saver','ScriptsGlobales\modulos_enjambre','runtime\agy','runtime\installers','git_bundles')) {
+        if (!(Test-Path -LiteralPath (Join-Path $source $group) -PathType Container)) { throw "Falta grupo del ecosistema: $group" }
+    }
     Write-Host "Integridad correcta: $($manifest.files.Count) archivos, paquete v5."
 }
 try {
@@ -50,12 +53,16 @@ try {
     Refresh-Path
     Paso 2 'Preparando Git y repositorio main...'
     if (!(Get-Command git.exe -ErrorAction SilentlyContinue)) { Winget 'Git.Git' }
+    $cloneSource = Join-Path $source 'git_bundles\dos-agentes-sync.bundle'
+    if (!(Test-Path -LiteralPath $cloneSource)) { throw 'Falta el bundle Git principal.' }
     if (!(Test-Path -LiteralPath $Destino)) {
-        Run git.exe @('clone','--branch','main',$repo,$Destino)
+        Run git.exe @('clone','--branch','main',$cloneSource,$Destino)
+        Run git.exe @('-C',$Destino,'remote','set-url','origin',$repo)
     } elseif (!(Test-Path -LiteralPath (Join-Path $Destino '.git'))) {
         # Un clon temporal conserva los archivos locales preexistentes.
         $clone = Join-Path $env:TEMP ('dos-agentes-git-' + [guid]::NewGuid())
-        Run git.exe @('clone','--branch','main',$repo,$clone)
+        Run git.exe @('clone','--branch','main',$cloneSource,$clone)
+        Run git.exe @('-C',$clone,'remote','set-url','origin',$repo)
         Copy-Item -LiteralPath (Join-Path $clone '.git') -Destination $Destino -Recurse
     }
     $remote = & git.exe -C $Destino remote get-url origin
@@ -88,6 +95,10 @@ try {
     if (!(Test-Path -LiteralPath $py)) { Run $python.Source @('-m','venv',$venv) }
     Run $py @('-m','pip','install','--upgrade','pip')
     Run $py @('-m','pip','install','-r','requirements.txt','-r','requirements_chat_fijo.txt','-r','requirements_instalacion.txt')
+    Run $py @('-m','pip','install','.\repos_referencia\token-saver')
+    if (Test-Path 'repos_referencia\Agentic-SEO-Skill\requirements.txt') {
+        Run $py @('-m','pip','install','-r','repos_referencia\Agentic-SEO-Skill\requirements.txt')
+    }
     Paso 4 'Instalando Node.js y paquetes npm (salida en vivo)...'
     $nodeOk = $false
     if (Get-Command node.exe -ErrorAction SilentlyContinue) {
@@ -102,34 +113,68 @@ try {
         & npm.cmd @NpmArguments
         if ($LASTEXITCODE -eq 0) { return }
         Write-Warning 'npm fallo. Se instalaran C++ Build Tools y Windows SDK; se reintentara una vez.'
-        Winget -id 'Microsoft.VisualStudio.2022.BuildTools' -Extra @('--override','--wait --quiet --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended')
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        if (!(Test-Path -LiteralPath $vswhere)) {
+            Winget -id 'Microsoft.VisualStudio.2022.BuildTools' -Extra @('--override','--wait --quiet --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended')
+        }
+        if (!(Test-Path -LiteralPath $vswhere)) { throw 'Build Tools no publico vswhere.exe.' }
+        $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        if (!$vs) {
+            $vs = & $vswhere -latest -products '*' -property installationPath
+            if (!$vs) { throw 'No se encontro Visual Studio Build Tools.' }
+            Run "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe" @('modify','--installPath',$vs,'--add','Microsoft.VisualStudio.Workload.VCTools','--includeRecommended','--quiet','--norestart')
+        }
+        $devcmd = Join-Path $vs 'Common7\Tools\VsDevCmd.bat'
+        $environment = & cmd.exe /d /s /c ('""' + $devcmd + '" -no_logo -arch=x64 && set"')
+        if ($LASTEXITCODE -ne 0) { throw 'No se pudo cargar el entorno C++.' }
+        foreach ($line in $environment) {
+            if ($line -match '^([^=]+)=(.*)$') { [Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process') }
+        }
         $env:npm_config_msvs_version = '2022'
-        $env:npm_config_python = $py
+        # node-gyp requiere un Python con soporte de su version; 3.12 es estable.
+        $gypPython = Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'
+        if (!(Test-Path $gypPython)) { $gypPython = Join-Path $env:ProgramFiles 'Python312\python.exe' }
+        if (!(Test-Path $gypPython)) {
+            Winget 'Python.Python.3.12'
+            $gypPython = Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'
+            if (!(Test-Path $gypPython)) { $gypPython = Join-Path $env:ProgramFiles 'Python312\python.exe' }
+        }
+        if (!(Test-Path $gypPython)) { throw 'No se encontro Python 3.12 para node-gyp.' }
+        $env:npm_config_python = $gypPython
+        $env:PYTHON = $gypPython
         Run npm.cmd $NpmArguments
     }
     Npm-Install -NpmArguments @('ci','--no-audit','--no-fund')
-    if (!(Get-Command codex.cmd -ErrorAction SilentlyContinue)) { Npm-Install -NpmArguments @('install','--global','@openai/codex') }
+    $globals = Get-Content 'dependencias\npm_globales.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($package in $globals.PSObject.Properties) {
+        Write-Host "Instalando paquete global $($package.Name)@$($package.Value.version)..."
+        Npm-Install -NpmArguments @('install','--global',($package.Name + '@' + $package.Value.version),'--no-audit','--no-fund')
+    }
+    $npmRoot = (& npm.cmd root --global).Trim()
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudo consultar npm root global.' }
+    Run node.exe @('scripts\verificar_sqlite_pc3.mjs',(Join-Path $npmRoot 'context-mode\package.json'))
+    Run $py @('-m','pip','check')
+    # Codex CLI no incluye el runtime Desktop requerido por node_repl/monitor.
+    $desktop = Get-AppxPackage -Name OpenAI.Codex
+    if (!$desktop) {
+        Run winget.exe @('install','--id','9PLM9XGG6VKS','--exact','--source','msstore','--silent','--accept-package-agreements','--accept-source-agreements','--disable-interactivity')
+        if (!(Get-AppxPackage -Name OpenAI.Codex)) { throw 'Codex Desktop no quedo instalado.' }
+    }
     Paso 5 'Configurando TOML, Cascada AG, Chat Fijo Gemini e inicio automatico...'
     Run $py @('scripts\configurar_pc3.py','--root',$Destino,'--home',$env:USERPROFILE)
     $globalScripts = Join-Path $env:USERPROFILE 'ScriptsGlobales'
     $userPath = [string][Environment]::GetEnvironmentVariable('Path','User')
-    if (@($userPath -split ';') -notcontains $globalScripts) {
-        [Environment]::SetEnvironmentVariable('Path', ($userPath.TrimEnd(';') + ';' + $globalScripts), 'User')
+    foreach ($directory in @($globalScripts,(Join-Path $Destino '.bin'),(Join-Path $Destino '.venv\Scripts'),(Join-Path $env:LOCALAPPDATA 'agy\bin'),(Join-Path $env:APPDATA 'npm'))) {
+        if (@($userPath -split ';') -notcontains $directory) { $userPath = $userPath.TrimEnd(';') + ';' + $directory }
     }
+    [Environment]::SetEnvironmentVariable('Path', $userPath, 'User')
     Refresh-Path
     $manager = Join-Path $Destino 'AntigravityManager\antigravity-manager.exe'
     if (!(Test-Path -LiteralPath $manager)) {
-        Write-Host 'Consultando la release oficial de Antigravity Manager (sin URLs de version fija)...'
-        $release = Invoke-RestMethod 'https://api.github.com/repos/Draculabo/AntigravityManager/releases/latest'
-        $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
-        $asset = @($release.assets | Where-Object { $_.name -like "*-windows-$arch-nsis.exe" })
-        if ($asset.Count -ne 1) { throw 'No se encontro un instalador Windows oficial inequívoco de Antigravity Manager.' }
-        $setup = Join-Path $env:TEMP ('AntigravityManager-' + [guid]::NewGuid() + '.exe')
-        Write-Host "Descargando $($asset[0].name)..."
-        # curl muestra bytes y velocidad durante toda la descarga.
-        Run curl.exe @('--fail','--location','--retry','2','--output',$setup,$asset[0].browser_download_url)
-        if (!$asset[0].digest -or $asset[0].digest -notmatch '^sha256:') { throw 'La release no publica SHA256; se detiene antes de ejecutar un binario sin verificar.' }
-        if ((Get-FileHash -LiteralPath $setup).Hash -ne ($asset[0].digest -replace '^sha256:','')) { throw 'SHA256 incorrecto del instalador de Antigravity Manager.' }
+        Write-Host 'Instalando Antigravity Manager 0.30.0 incluido y verificado (sin descarga 404)...'
+        if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { throw 'Este paquete reproduce PC1 x64; no es un instalador ARM64.' }
+        $setup = Join-Path $Destino 'runtime\installers\Antigravity.Manager-0.30.0-windows-x64-nsis.exe'
+        if ((Get-FileHash -LiteralPath $setup).Hash -ne '702ff72d50ff00412bb6b16822131cc5ea6f56e6b28da9edc527c6beb6181762') { throw 'SHA256 incorrecto del instalador de Manager.' }
         $install = Start-Process -FilePath $setup -ArgumentList @('/S',('/D=' + (Split-Path $manager -Parent))) -PassThru -Wait
         if ($install.ExitCode -ne 0 -or !(Test-Path -LiteralPath $manager)) { throw 'Antigravity Manager no quedo instalado en el destino esperado.' }
     }
@@ -153,7 +198,7 @@ try {
     Start-Process -FilePath $manager -WorkingDirectory (Split-Path $manager -Parent) -WindowStyle Hidden | Out-Null
     # Inicio local inmediato; la sincronizacion Git queda en la tarea periodica.
     Run $py @('scripts\configurar_pc3.py','--root',$Destino,'--home',$env:USERPROFILE,'--iniciar')
-    Start-Process -FilePath "$env:WINDIR\System32\wscript.exe" -ArgumentList ('//B //Nologo "' + (Join-Path $Destino 'abrir_chrome_gemini_oculto.bat') + '"') -WindowStyle Hidden | Out-Null
+    Start-Process -FilePath "$env:WINDIR\System32\cmd.exe" -ArgumentList ('/d /s /c ""' + (Join-Path $Destino 'abrir_chrome_gemini_oculto.bat') + '""') -WorkingDirectory $Destino -WindowStyle Hidden | Out-Null
     Write-Host 'INSTALACION COMPLETA - v5' -ForegroundColor Green
     Write-Host 'Debe volver a autenticar las cuentas en Antigravity Manager y Gemini: no se migraron credenciales ni perfiles DPAPI.' -ForegroundColor Yellow
     Write-Host 'Codex usa la exportacion auth_c1.json si no existia auth.json. Si expiro su sesion, vuelva a iniciar sesion. Gemini: abrir_chrome_gemini.bat.'

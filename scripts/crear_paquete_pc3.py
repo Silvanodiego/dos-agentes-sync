@@ -27,7 +27,8 @@ def allowed(relative):
     parts = [s.lower() for s in path.parts]
     forbidden_dirs = {'logs', 'node_modules', '__pycache__', '.venv', 'venv', '.git',
                       'chrome_gemini_profile', '.antigravity-agent', '.sync-local',
-                      'config_backups', 'sessions', 'repos_referencia'}
+                      'config_backups', 'sessions', '.cache', 'tmp', 'temp', 'cookies',
+                      'credentials', 'credenciales', '.plugin-appserver'}
     if forbidden_dirs.intersection(parts):
         return False
     name = parts[-1]
@@ -36,7 +37,7 @@ def allowed(relative):
         return True
     patterns = ('*.db', '*.db-*', '*.sqlite*', '*.log', '*.jsonl', '*.pyc', '*.bak',
                 '*_bak_*', '*_backup*', 'auth*.json', '*credentials*', '*token*.json',
-                'local_bridge_token', '.env', '*.pem', '*.key', '*.zip')
+                'local_bridge_token', '.env', '.env.*', '*.pem', '*.key', '*.zip', '*.tmp', '*.old')
     return not any(fnmatch.fnmatch(name, p) for p in patterns)
 
 
@@ -59,6 +60,9 @@ def build(desktop: Path, drive: Path):
             shutil.copy2(ROOT / relative, target)
         shutil.copy2(stage / 'config_compartida/AGENTS.md', stage / 'AGENTS.md')
         shutil.copy2(stage / 'config_compartida/agy.bat', stage / 'agy.bat')
+        from ecosistema_paquete_pc3 import assemble
+        print('Recuperando ecosistema completo y verificando bundles...', flush=True)
+        assemble(stage, ROOT, allowed)
         required = ('instalar.bat', 'scripts/instalar_pc3.ps1', 'scripts/configurar_pc3.py',
                     'scripts/esquemas_pc3.py', 'arrancar_todo_oculto.vbs',
                     'chat_fijo_gemini.py', 'piloto_gemini.py', 'abrir_chrome_gemini.bat',
@@ -82,7 +86,8 @@ def build(desktop: Path, drive: Path):
         if result.returncode:
             raise RuntimeError('Fallo instalar.bat -Verificar.')
         zip_path = Path(tmp) / (NAME + '.zip')
-        with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9,
+                             strict_timestamps=False) as archive:
             for path in sorted(stage.rglob('*')):
                 if path.is_file():
                     archive.write(path, NAME + '/' + path.relative_to(stage).as_posix())

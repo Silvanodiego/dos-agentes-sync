@@ -7,6 +7,8 @@ import sqlite3
 import tempfile
 import tomllib
 import unittest
+from unittest.mock import patch
+import zipfile
 
 ROOT = Path(__file__).resolve().parent
 
@@ -23,6 +25,24 @@ package = load('crear_paquete_pc3')
 
 
 class InstallerTests(unittest.TestCase):
+    def test_full_template_preserves_plugins_and_expands_paths(self):
+        previous = Path.home() / 'Desktop/Migracion_Codex_Limpia_v4.zip'
+        with zipfile.ZipFile(previous) as archive:
+            base = tomllib.loads(archive.read('config.toml').decode('utf-8-sig'))
+        shared = tomllib.loads((ROOT / 'config_compartida/config.toml').read_text(encoding='utf-8-sig'))
+        base['mcp_servers']['antigravity_bridge'] = shared['mcp_servers']['antigravity_bridge']
+        import tomlkit
+        with patch.dict('os.environ', {'CODEX_APP_DIR': 'C:/Apps/Codex/app',
+                                      'DRIVE_ROOT': 'J:/Mi unidad', 'LOCALAPPDATA': 'C:/Users/Nuevo/AppData/Local'}):
+            rendered = setup.render_config(tomlkit.dumps(base), None, Path('C:/Users/Nuevo'), Path('C:/dos_agentes_local'))
+        result = tomllib.loads(rendered)
+        self.assertEqual(len(result['plugins']), len(base['plugins']))
+        self.assertEqual(set(result['mcp_servers']), {'node_repl', 'cua_repl', 'antigravity_bridge'})
+        self.assertNotIn('%USERPROFILE%', rendered)
+        self.assertNotIn('%DOS_AGENTES_HOME%', rendered)
+        self.assertNotIn('%CODEX_APP_DIR%', rendered)
+        self.assertEqual(len(result['notify']), 2)
+
     def test_merge_preserves_notify_and_other_mcp(self):
         template = (ROOT / 'config_compartida/config.toml').read_text(encoding='utf-8-sig')
         old = 'notify=["cmd", "/c", "echo listo"]\n[mcp_servers.otro]\ncommand="ejemplo"\n'
@@ -74,6 +94,8 @@ class InstallerTests(unittest.TestCase):
                 self.assertFalse(package.allowed(path))
         for path in ('bridge_server.py', 'config_compartida/config.toml', 'chat_fijo_gemini.py', 'auth_c1.json', 'auth_c2.json'):
             self.assertTrue(package.allowed(path))
+        self.assertTrue(package.allowed('repos_referencia/token-saver/pyproject.toml'))
+        self.assertFalse(package.allowed('codex/plugins/.plugin-appserver/codex.exe'))
 
 
 if __name__ == '__main__':

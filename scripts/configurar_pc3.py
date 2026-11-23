@@ -17,7 +17,15 @@ import tomlkit
 
 def expand(value, home: Path, root: Path):
     if isinstance(value, str):
-        return value.replace('%USERPROFILE%', str(home)).replace('C:\\dos_agentes_local', str(root))
+        value = value.replace('%USERPROFILE%', str(home)).replace('C:\\dos_agentes_local', str(root))
+        for key in ('DOS_AGENTES_HOME', 'LOCALAPPDATA', 'DRIVE_ROOT', 'CODEX_APP_DIR'):
+            if key == 'DOS_AGENTES_HOME':
+                replacement = str(root)
+            else:
+                replacement = os.environ.get(key, '')
+            if replacement:
+                value = value.replace('%' + key + '%', replacement.replace('\\', '/'))
+        return value
     if isinstance(value, list):
         return [expand(item, home, root) for item in value]
     if isinstance(value, dict):
@@ -69,7 +77,16 @@ def configure(root: Path, home: Path):
     codex = home / '.codex'
     codex.mkdir(parents=True, exist_ok=True)
     target = codex / 'config.toml'
-    result = render_config((shared / 'config.toml').read_text(encoding='utf-8-sig'),
+    template = root / 'config.toml'
+    if template.is_file():
+        sys.path.insert(0, str(Path(__file__).parent))
+        from restaurar_ecosistema_pc3 import restore, values
+        replacements = values(home, root)
+        os.environ.update(replacements)
+        restore(root, home, replacements)
+    else:
+        template = shared / 'config.toml'
+    result = render_config(template.read_text(encoding='utf-8-sig'),
                            target.read_text(encoding='utf-8-sig') if target.exists() else None,
                            home, root)
     target.write_text(result, encoding='utf-8')
