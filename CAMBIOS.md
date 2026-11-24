@@ -19,6 +19,8 @@
 - Pruebas existentes y verificacion del paquete. El log de MSI de PC3 no es accesible desde PC1:
   no se atribuye causa especifica a 1603 ni se anuncia instalacion remota exitosa.
 - Cascada AG fallo con HTTP502; no se reintento la inferencia.
+- Modulos Utility/Archive cargados explicitamente: la prueba con PATH reducido
+  detecto un fallo de autocarga en PowerShell 5.1 y se corrigio antes de entregar.
 - Sin cambios en bridge_server.py, consultar_gemini.py ni bucle_autonomo.py.
 
 ## 2026-11-24 - Instalador PC 3 v6: argumentos nativos corregidos
