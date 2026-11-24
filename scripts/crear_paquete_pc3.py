@@ -1,4 +1,4 @@
-"""Construye v5 desde las fuentes Git, con exclusion estricta e integridad."""
+"""Construye v6 desde las fuentes Git, con exclusion estricta e integridad."""
 import argparse
 import ast
 import fnmatch
@@ -13,7 +13,7 @@ import tomllib
 import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
-NAME = 'Migracion_Codex_Limpia_v5'
+NAME = 'Migracion_Codex_Limpia_v6'
 PROTECTED = ('bridge_server.py', 'consultar_gemini.py', 'bucle_autonomo.py')
 
 
@@ -51,7 +51,7 @@ def build(desktop: Path, drive: Path):
         sources.append(name)
     if any(not (ROOT / p).is_file() for p in sources):
         raise RuntimeError('Hay fuentes Git faltantes.')
-    with tempfile.TemporaryDirectory(prefix='codex-v5-package-') as tmp:
+    with tempfile.TemporaryDirectory(prefix='codex-v6-package-') as tmp:
         stage = Path(tmp) / NAME
         stage.mkdir()
         for relative in sources:
@@ -77,7 +77,7 @@ def build(desktop: Path, drive: Path):
                 ast.parse((stage / relative).read_text(encoding='utf-8-sig'), filename=relative)
         rows = [{'path': p.relative_to(stage).as_posix(), 'sha256': sha(p), 'bytes': p.stat().st_size}
                 for p in sorted(stage.rglob('*')) if p.is_file()]
-        manifest = {'version': 'v5', 'git_commit': subprocess.check_output(
+        manifest = {'version': 'v6', 'git_commit': subprocess.check_output(
             ['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
             'protected_sha256': protected, 'files': rows}
         (stage / 'MANIFIESTO_SHA256.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
@@ -85,6 +85,9 @@ def build(desktop: Path, drive: Path):
                                 cwd=stage, check=False)
         if result.returncode:
             raise RuntimeError('Fallo instalar.bat -Verificar.')
+        subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                        '-File', str(stage / 'scripts/test_argumentos_instalador_pc3.ps1')],
+                       cwd=stage, check=True)
         zip_path = Path(tmp) / (NAME + '.zip')
         with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9,
                              strict_timestamps=False) as archive:

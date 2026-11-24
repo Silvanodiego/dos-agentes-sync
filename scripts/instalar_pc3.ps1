@@ -10,14 +10,14 @@ function Refresh-Path {
     Get-ChildItem "$env:LOCALAPPDATA\Programs\Python" -Directory -ErrorAction SilentlyContinue | ForEach-Object { $env:Path = $_.FullName + ';' + (Join-Path $_.FullName 'Scripts') + ';' + $env:Path }
 }
 function Run {
-    param($exe, [Parameter(ValueFromRemainingArguments=$true)][string[]]$Arguments)
+    param([Parameter(Mandatory=$true)][string]$exe, [string[]]$Arguments)
     Write-Host ('> ' + $exe + ' ' + ($Arguments -join ' '))
     & $exe @Arguments
     if ($LASTEXITCODE -ne 0) { throw "Fallo ($LASTEXITCODE): $exe $($Arguments -join ' ')" }
 }
 function Winget($id, [string[]]$Extra = @()) {
     if (!(Get-Command winget.exe -ErrorAction SilentlyContinue)) { throw 'Falta winget (App Installer de Microsoft). No se puede instalar requisitos sin el gestor del sistema.' }
-    Run winget.exe (@('install','--id',$id,'--exact','--source','winget','--silent','--accept-package-agreements','--accept-source-agreements','--disable-interactivity') + $Extra)
+    Run -exe winget.exe -Arguments (@('install','--id',$id,'--exact','--source','winget','--silent','--accept-package-agreements','--accept-source-agreements','--disable-interactivity') + $Extra)
     Refresh-Path
 }
 function Check-Package {
@@ -37,7 +37,7 @@ function Check-Package {
     foreach ($group in @('codex\skills','codex\plugins','codex\marketplaces','repos_referencia\token-saver','ScriptsGlobales\modulos_enjambre','runtime\agy','runtime\installers','git_bundles')) {
         if (!(Test-Path -LiteralPath (Join-Path $source $group) -PathType Container)) { throw "Falta grupo del ecosistema: $group" }
     }
-    Write-Host "Integridad correcta: $($manifest.files.Count) archivos, paquete v5."
+    Write-Host "Integridad correcta: $($manifest.files.Count) archivos, paquete v6."
 }
 try {
     Paso 1 'Verificando integridad...'
@@ -56,13 +56,13 @@ try {
     $cloneSource = Join-Path $source 'git_bundles\dos-agentes-sync.bundle'
     if (!(Test-Path -LiteralPath $cloneSource)) { throw 'Falta el bundle Git principal.' }
     if (!(Test-Path -LiteralPath $Destino)) {
-        Run git.exe @('clone','--branch','main',$cloneSource,$Destino)
-        Run git.exe @('-C',$Destino,'remote','set-url','origin',$repo)
+        Run -exe git.exe -Arguments @('clone','--branch','main',$cloneSource,$Destino)
+        Run -exe git.exe -Arguments @('-C',$Destino,'remote','set-url','origin',$repo)
     } elseif (!(Test-Path -LiteralPath (Join-Path $Destino '.git'))) {
         # Un clon temporal conserva los archivos locales preexistentes.
         $clone = Join-Path $env:TEMP ('dos-agentes-git-' + [guid]::NewGuid())
-        Run git.exe @('clone','--branch','main',$cloneSource,$clone)
-        Run git.exe @('-C',$clone,'remote','set-url','origin',$repo)
+        Run -exe git.exe -Arguments @('clone','--branch','main',$cloneSource,$clone)
+        Run -exe git.exe -Arguments @('-C',$clone,'remote','set-url','origin',$repo)
         Copy-Item -LiteralPath (Join-Path $clone '.git') -Destination $Destino -Recurse
     }
     $remote = & git.exe -C $Destino remote get-url origin
@@ -92,12 +92,12 @@ try {
     if (!$pythonOk) { Winget 'Python.Python.3.14'; $python = Get-Command python.exe -ErrorAction Stop }
     $venv = Join-Path $Destino '.venv'
     $py = Join-Path $venv 'Scripts\python.exe'
-    if (!(Test-Path -LiteralPath $py)) { Run $python.Source @('-m','venv',$venv) }
-    Run $py @('-m','pip','install','--upgrade','pip')
-    Run $py @('-m','pip','install','-r','requirements.txt','-r','requirements_chat_fijo.txt','-r','requirements_instalacion.txt')
-    Run $py @('-m','pip','install','.\repos_referencia\token-saver')
+    if (!(Test-Path -LiteralPath $py)) { Run -exe $python.Source -Arguments @('-m','venv',$venv) }
+    Run -exe $py -Arguments @('-m','pip','install','--upgrade','pip')
+    Run -exe $py -Arguments @('-m','pip','install','-r','requirements.txt','-r','requirements_chat_fijo.txt','-r','requirements_instalacion.txt')
+    Run -exe $py -Arguments @('-m','pip','install','.\repos_referencia\token-saver')
     if (Test-Path 'repos_referencia\Agentic-SEO-Skill\requirements.txt') {
-        Run $py @('-m','pip','install','-r','repos_referencia\Agentic-SEO-Skill\requirements.txt')
+        Run -exe $py -Arguments @('-m','pip','install','-r','repos_referencia\Agentic-SEO-Skill\requirements.txt')
     }
     Paso 4 'Instalando Node.js y paquetes npm (salida en vivo)...'
     $nodeOk = $false
@@ -122,7 +122,7 @@ try {
         if (!$vs) {
             $vs = & $vswhere -latest -products '*' -property installationPath
             if (!$vs) { throw 'No se encontro Visual Studio Build Tools.' }
-            Run "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe" @('modify','--installPath',$vs,'--add','Microsoft.VisualStudio.Workload.VCTools','--includeRecommended','--quiet','--norestart')
+            Run -exe "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe" -Arguments @('modify','--installPath',$vs,'--add','Microsoft.VisualStudio.Workload.VCTools','--includeRecommended','--quiet','--norestart')
         }
         $devcmd = Join-Path $vs 'Common7\Tools\VsDevCmd.bat'
         $environment = & cmd.exe /d /s /c ('""' + $devcmd + '" -no_logo -arch=x64 && set"')
@@ -142,7 +142,7 @@ try {
         if (!(Test-Path $gypPython)) { throw 'No se encontro Python 3.12 para node-gyp.' }
         $env:npm_config_python = $gypPython
         $env:PYTHON = $gypPython
-        Run npm.cmd $NpmArguments
+        Run -exe npm.cmd -Arguments $NpmArguments
     }
     Npm-Install -NpmArguments @('ci','--no-audit','--no-fund')
     $globals = Get-Content 'dependencias\npm_globales.json' -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -152,16 +152,16 @@ try {
     }
     $npmRoot = (& npm.cmd root --global).Trim()
     if ($LASTEXITCODE -ne 0) { throw 'No se pudo consultar npm root global.' }
-    Run node.exe @('scripts\verificar_sqlite_pc3.mjs',(Join-Path $npmRoot 'context-mode\package.json'))
-    Run $py @('-m','pip','check')
+    Run -exe node.exe -Arguments @('scripts\verificar_sqlite_pc3.mjs',(Join-Path $npmRoot 'context-mode\package.json'))
+    Run -exe $py -Arguments @('-m','pip','check')
     # Codex CLI no incluye el runtime Desktop requerido por node_repl/monitor.
     $desktop = Get-AppxPackage -Name OpenAI.Codex
     if (!$desktop) {
-        Run winget.exe @('install','--id','9PLM9XGG6VKS','--exact','--source','msstore','--silent','--accept-package-agreements','--accept-source-agreements','--disable-interactivity')
+        Run -exe winget.exe -Arguments @('install','--id','9PLM9XGG6VKS','--exact','--source','msstore','--silent','--accept-package-agreements','--accept-source-agreements','--disable-interactivity')
         if (!(Get-AppxPackage -Name OpenAI.Codex)) { throw 'Codex Desktop no quedo instalado.' }
     }
     Paso 5 'Configurando TOML, Cascada AG, Chat Fijo Gemini e inicio automatico...'
-    Run $py @('scripts\configurar_pc3.py','--root',$Destino,'--home',$env:USERPROFILE)
+    Run -exe $py -Arguments @('scripts\configurar_pc3.py','--root',$Destino,'--home',$env:USERPROFILE)
     $globalScripts = Join-Path $env:USERPROFILE 'ScriptsGlobales'
     $userPath = [string][Environment]::GetEnvironmentVariable('Path','User')
     foreach ($directory in @($globalScripts,(Join-Path $Destino '.bin'),(Join-Path $Destino '.venv\Scripts'),(Join-Path $env:LOCALAPPDATA 'agy\bin'),(Join-Path $env:APPDATA 'npm'))) {
@@ -197,9 +197,9 @@ try {
     Paso 6 'Iniciando servicios...'
     Start-Process -FilePath $manager -WorkingDirectory (Split-Path $manager -Parent) -WindowStyle Hidden | Out-Null
     # Inicio local inmediato; la sincronizacion Git queda en la tarea periodica.
-    Run $py @('scripts\configurar_pc3.py','--root',$Destino,'--home',$env:USERPROFILE,'--iniciar')
+    Run -exe $py -Arguments @('scripts\configurar_pc3.py','--root',$Destino,'--home',$env:USERPROFILE,'--iniciar')
     Start-Process -FilePath "$env:WINDIR\System32\cmd.exe" -ArgumentList ('/d /s /c ""' + (Join-Path $Destino 'abrir_chrome_gemini_oculto.bat') + '""') -WorkingDirectory $Destino -WindowStyle Hidden | Out-Null
-    Write-Host 'INSTALACION COMPLETA - v5' -ForegroundColor Green
+    Write-Host 'INSTALACION COMPLETA - v6' -ForegroundColor Green
     Write-Host 'Debe volver a autenticar las cuentas en Antigravity Manager y Gemini: no se migraron credenciales ni perfiles DPAPI.' -ForegroundColor Yellow
     Write-Host 'Codex usa la exportacion auth_c1.json si no existia auth.json. Si expiro su sesion, vuelva a iniciar sesion. Gemini: abrir_chrome_gemini.bat.'
     exit 0

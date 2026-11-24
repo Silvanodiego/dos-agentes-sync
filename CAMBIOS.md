@@ -1,5 +1,22 @@
 # Registro de cambios
 
+## 2026-11-24 - Instalador PC 3 v6: argumentos nativos corregidos
+
+- `scripts/instalar_pc3.ps1`: se elimina ValueFromRemainingArguments de Run y
+  se pasan ejecutable/argumentos por nombre. Winget recibe tokens separados;
+  Git, pip, npm y Build Tools conservan rutas y valores con espacios.
+- `scripts/test_argumentos_instalador_pc3.ps1`: reproduce el fallo v5 (1
+  argumento en lugar de 10) con un ejecutable capturador, sin instalar nada.
+  Verifica winget, --override como un unico valor, rutas con espacios y errores.
+- `instalar.bat`, `scripts/crear_paquete_pc3.py`,
+  `scripts/ecosistema_paquete_pc3.py` y `scripts/configurar_pc3.py`: version v6;
+  conserva el ecosistema completo y genera ZIP nuevos sin reemplazar v5.
+- `LEEME_PC3_v6.md` documenta la version nueva sin modificar la guia v5.
+- El empaquetador exige tambien que pase la prueba argv sobre el contenido final.
+- Se valida sintaxis PowerShell/TOML e integridad del paquete con
+  `instalar.bat -Verificar`; no se ejecuta una instalacion completa en PC 1.
+- bridge_server.py, consultar_gemini.py y bucle_autonomo.py permanecen intactos.
+
 ## 2026-11-23 - Instalador limpio PC 3 v5
 
 - Se completo el destino antes inexistente `scripts/instalar_pc3.ps1` de
@@ -33,46 +50,46 @@
   ni los respaldos. Cascada AG devolvio HTTP 502 en la consulta de analisis;
   no se reintento inferencia y las comprobaciones fueron locales.
 
-## 2026-11-23 — Chat Fijo Gemini independiente de Cascada AG
+## 2026-11-23 â€” Chat Fijo Gemini independiente de Cascada AG
 
 Archivos nuevos en `C:\dos_agentes_local\`:
 
-| Archivo | Función |
+| Archivo | FunciÃ³n |
 | --- | --- |
-| `chat_fijo_gemini.py` | Cliente de chat fijo por Playwright/CDP 9222. Lee `config_chats` en SQLite en modo solo lectura, normaliza el nombre del proyecto y usa `DOS_AGENTES` como fallback. Reutiliza la pestaña del mismo identificador de chat, ignorando parámetros de idioma; si falta, abre la URL configurada. Envía texto multilínea y devuelve únicamente el contenido de la respuesta nueva cuando termina la generación y permanece estable. |
-| `piloto_gemini.py` | Orquesta pasos de `codex exec` en la carpeta del proyecto y revisiones en ese chat. Acepta nombre registrado en `project_brain`, ruta existente o `--folder`. Termina con `[ENTREGA_FINAL]` en línea propia, error o límite de vueltas (4 por defecto, máximo 20). |
+| `chat_fijo_gemini.py` | Cliente de chat fijo por Playwright/CDP 9222. Lee `config_chats` en SQLite en modo solo lectura, normaliza el nombre del proyecto y usa `DOS_AGENTES` como fallback. Reutiliza la pestaÃ±a del mismo identificador de chat, ignorando parÃ¡metros de idioma; si falta, abre la URL configurada. EnvÃ­a texto multilÃ­nea y devuelve Ãºnicamente el contenido de la respuesta nueva cuando termina la generaciÃ³n y permanece estable. |
+| `piloto_gemini.py` | Orquesta pasos de `codex exec` en la carpeta del proyecto y revisiones en ese chat. Acepta nombre registrado en `project_brain`, ruta existente o `--folder`. Termina con `[ENTREGA_FINAL]` en lÃ­nea propia, error o lÃ­mite de vueltas (4 por defecto, mÃ¡ximo 20). |
 | `requirements_chat_fijo.txt` | Dependencia Playwright separada de los requisitos existentes. No requiere descargar un navegador: utiliza el Chrome/Edge ya abierto. |
-| `test_chat_fijo_gemini.py` | 15 pruebas locales de selección/fallback y lectura sin escrituras, validación de URL, error de conexión, espera de respuestas, cierre del ciclo, límite de vueltas y cancelación del proceso Codex. No consultan Gemini ni ejecutan Codex real. |
+| `test_chat_fijo_gemini.py` | 15 pruebas locales de selecciÃ³n/fallback y lectura sin escrituras, validaciÃ³n de URL, error de conexiÃ³n, espera de respuestas, cierre del ciclo, lÃ­mite de vueltas y cancelaciÃ³n del proceso Codex. No consultan Gemini ni ejecutan Codex real. |
 | `CAMBIOS.md` | Este registro de archivos, reglas, uso y comprobaciones. |
 
 Archivo compartido actualizado: `config_compartida\AGENTS.md`. Se documentaron
-los nombres **Cascada AG** (4 cuentas de Antigravity, 8765 → 8045) y **Chat Fijo
-Gemini** (chat del proyecto, CDP 9222). Se agregó la regla de conservar scripts
-funcionales y registrar cambios con commit. Se replicó íntegramente a
+los nombres **Cascada AG** (4 cuentas de Antigravity, 8765 â†’ 8045) y **Chat Fijo
+Gemini** (chat del proyecto, CDP 9222). Se agregÃ³ la regla de conservar scripts
+funcionales y registrar cambios con commit. Se replicÃ³ Ã­ntegramente a
 `C:\dos_agentes_local\AGENTS.md` y `C:\Users\H_P\.codex\AGENTS.md`.
-La copia del directorio raíz sigue excluida por el `.gitignore` existente;
+La copia del directorio raÃ­z sigue excluida por el `.gitignore` existente;
 la fuente versionada es `config_compartida\AGENTS.md`.
 
-### Protección y límites
+### ProtecciÃ³n y lÃ­mites
 
 - No se modificaron `bridge_server.py`, `consultar_gemini.py`, `bucle_autonomo.py`,
-  la configuración del MCP, el servicio 8765/8045, el panel 8787 ni la base SQLite.
+  la configuraciÃ³n del MCP, el servicio 8765/8045, el panel 8787 ni la base SQLite.
 - El cliente usa un bloqueo del sistema operativo por chat para evitar dos
-  pilotos simultáneos. Respeta borradores existentes y generaciones en curso.
-  Al salir desconecta Playwright sin cerrar pestañas ni el navegador del usuario.
-- La conexión tiene tiempo límite; falta de sesión, error de envío o respuesta
+  pilotos simultÃ¡neos. Respeta borradores existentes y generaciones en curso.
+  Al salir desconecta Playwright sin cerrar pestaÃ±as ni el navegador del usuario.
+- La conexiÃ³n tiene tiempo lÃ­mite; falta de sesiÃ³n, error de envÃ­o o respuesta
   incompleta detienen el ciclo sin reintentar mensajes. Codex tampoco se inicia
-  si la conexión, el chat o el editor fallan antes del primer paso.
-- Codex utiliza su configuración/autenticación existentes y sandbox
-  `workspace-write`. Cada paso tiene un límite de 900 segundos por defecto y se
-  detiene también ante Ctrl+C. No se fuerza ningún modelo ni se modifica el MCP.
-- Gemini recibe la tarea y hasta los últimos 16000 caracteres del informe de
-  Codex. Sus sugerencias no amplían la autorización original. No incluir secretos
-  en tareas ni informes. Solo se envía el informe final de Codex, no sus logs.
+  si la conexiÃ³n, el chat o el editor fallan antes del primer paso.
+- Codex utiliza su configuraciÃ³n/autenticaciÃ³n existentes y sandbox
+  `workspace-write`. Cada paso tiene un lÃ­mite de 900 segundos por defecto y se
+  detiene tambiÃ©n ante Ctrl+C. No se fuerza ningÃºn modelo ni se modifica el MCP.
+- Gemini recibe la tarea y hasta los Ãºltimos 16000 caracteres del informe de
+  Codex. Sus sugerencias no amplÃ­an la autorizaciÃ³n original. No incluir secretos
+  en tareas ni informes. Solo se envÃ­a el informe final de Codex, no sus logs.
 - Estado, informes y logs se guardan en `.sync-local\chat-fijo\`, ya excluido
-  de Git. Las ejecuciones interrumpidas no se reanudan automáticamente.
-- Estos módulos se ejecutan por pedido; no se alteró el arranque de Windows ni
-  se creó una tarea que inicie el piloto por su cuenta.
+  de Git. Las ejecuciones interrumpidas no se reanudan automÃ¡ticamente.
+- Estos mÃ³dulos se ejecutan por pedido; no se alterÃ³ el arranque de Windows ni
+  se creÃ³ una tarea que inicie el piloto por su cuenta.
 
 ### Uso desde PowerShell
 
@@ -80,172 +97,172 @@ la fuente versionada es `config_compartida\AGENTS.md`.
 # Instalar solo si falta Playwright; ya estaba instalado en esta PC (1.64.1).
 & C:\dos_agentes_local\.venv\Scripts\python.exe -m pip install -r C:\dos_agentes_local\requirements_chat_fijo.txt
 
-# Prueba de conexión: no abre pestañas ni envía mensajes.
+# Prueba de conexiÃ³n: no abre pestaÃ±as ni envÃ­a mensajes.
 & C:\dos_agentes_local\.venv\Scripts\python.exe C:\dos_agentes_local\chat_fijo_gemini.py --project DOS_AGENTES --check
 
 # Consulta individual al chat registrado (o fallback DOS_AGENTES).
-& C:\dos_agentes_local\.venv\Scripts\python.exe C:\dos_agentes_local\chat_fijo_gemini.py --project DOS_AGENTES --message "Revisá este avance: ..."
+& C:\dos_agentes_local\.venv\Scripts\python.exe C:\dos_agentes_local\chat_fijo_gemini.py --project DOS_AGENTES --message "RevisÃ¡ este avance: ..."
 
 # Piloto: nombre registrado o carpeta existente; se puede indicar --folder.
-& C:\dos_agentes_local\.venv\Scripts\python.exe C:\dos_agentes_local\piloto_gemini.py --project DOS_AGENTES --folder C:\dos_agentes_local --task "Describí la tarea autorizada" --max-turns 4
+& C:\dos_agentes_local\.venv\Scripts\python.exe C:\dos_agentes_local\piloto_gemini.py --project DOS_AGENTES --folder C:\dos_agentes_local --task "DescribÃ­ la tarea autorizada" --max-turns 4
 
 & C:\dos_agentes_local\.venv\Scripts\python.exe -B -m unittest discover -s C:\dos_agentes_local -p test_chat_fijo_gemini.py -v
 ```
 
 Si CDP no responde, abrir Chrome/Edge con `--remote-debugging-port=9222` y
 un perfil dedicado, por ejemplo `--user-data-dir="%USERPROFILE%\GeminiCDP"`
-desde un acceso directo, e iniciar sesión en Gemini en ese perfil. Si se usa
-el túnel CDP existente, restablecer ese túnel. El cliente no inicia navegadores
-ni cambia perfiles, cuentas, túneles o procesos por su cuenta.
+desde un acceso directo, e iniciar sesiÃ³n en Gemini en ese perfil. Si se usa
+el tÃºnel CDP existente, restablecer ese tÃºnel. El cliente no inicia navegadores
+ni cambia perfiles, cuentas, tÃºneles o procesos por su cuenta.
 
-### Verificación de esta entrega
+### VerificaciÃ³n de esta entrega
 
-- Pasaron las 15 pruebas automáticas sin llamadas reales a Gemini/Codex.
-- Se comprobó que los argumentos usados por el piloto existen en `codex exec --help`.
+- Pasaron las 15 pruebas automÃ¡ticas sin llamadas reales a Gemini/Codex.
+- Se comprobÃ³ que los argumentos usados por el piloto existen en `codex exec --help`.
 - La prueba real `chat_fijo_gemini.py --project DOS_AGENTES --check --connect-timeout 3`
-  terminó con error controlado: **127.0.0.1:9222 no respondió**. No se enviaron
-  mensajes ni se inició Codex. Falta probar envío/respuesta contra una sesión
+  terminÃ³ con error controlado: **127.0.0.1:9222 no respondiÃ³**. No se enviaron
+  mensajes ni se iniciÃ³ Codex. Falta probar envÃ­o/respuesta contra una sesiÃ³n
   Gemini accesible; los selectores pueden requerir un parche si cambia su interfaz.
 - Los tres scripts protegidos se verifican con SHA256 y diff de Git antes del commit.
 
-Referencia técnica: [Playwright Python — Browser y conexión CDP](https://playwright.dev/python/docs/api/class-browser).
+Referencia tÃ©cnica: [Playwright Python â€” Browser y conexiÃ³n CDP](https://playwright.dev/python/docs/api/class-browser).
 
-## 2026-11-23 — Lanzador de Chrome/Edge y prueba de conexión
+## 2026-11-23 â€” Lanzador de Chrome/Edge y prueba de conexiÃ³n
 
 - **Nuevo `abrir_chrome_gemini.bat`:** detecta Chrome en las ubicaciones de
-  instalación habituales y en PATH; si falta, busca Edge. Abre el navegador
+  instalaciÃ³n habituales y en PATH; si falta, busca Edge. Abre el navegador
   con `--remote-debugging-port=9222`, el perfil dedicado
   `C:\dos_agentes_local\chrome_gemini_profile` y la URL fija
   `https://gemini.google.com/app/ebb372bdb46e6358?hl=es_419`.
   Devuelve error si no encuentra navegador o falla el lanzamiento.
-- **`.gitignore`:** agregado `chrome_gemini_profile/` para excluir íntegramente
-  el perfil, incluidas cookies, sesiones y cualquier archivo de código que
-  pudiera contener. `git check-ignore` confirmó la exclusión.
-- **`CAMBIOS.md`:** agregado este registro. No se creó ningún ZIP ni se cambió
+- **`.gitignore`:** agregado `chrome_gemini_profile/` para excluir Ã­ntegramente
+  el perfil, incluidas cookies, sesiones y cualquier archivo de cÃ³digo que
+  pudiera contener. `git check-ignore` confirmÃ³ la exclusiÃ³n.
+- **`CAMBIOS.md`:** agregado este registro. No se creÃ³ ningÃºn ZIP ni se cambiÃ³
   `bridge_server.py`, el MCP, `consultar_gemini.py` o `bucle_autonomo.py`.
-- Chrome y Edge están instalados. La revisión automática rechazó el comando
+- Chrome y Edge estÃ¡n instalados. La revisiÃ³n automÃ¡tica rechazÃ³ el comando
   `Start-Process` que ejecutaba el BAT en segundo plano con el mensaje
-  **`blocked by policy`**, sin detallar otro motivo. Ese comando no se ejecutó;
-  no se intentó eludir el bloqueo mediante otra herramienta de lanzamiento.
+  **`blocked by policy`**, sin detallar otro motivo. Ese comando no se ejecutÃ³;
+  no se intentÃ³ eludir el bloqueo mediante otra herramienta de lanzamiento.
 - `chat_fijo_gemini.py --project DOS_AGENTES --check --connect-timeout 3`
-  informó de forma controlada que 9222 no responde. También se consultó
+  informÃ³ de forma controlada que 9222 no responde. TambiÃ©n se consultÃ³
   `http://127.0.0.1:9222/json/version` durante hasta 15 segundos.
-- La prueba con el mensaje `Prueba de conexión desde Chat Fijo Gemini.
-  Respondé solo: CONEXION_OK` queda pendiente: no hubo conexión CDP, no se
-  envió ningún mensaje, no se recibió una respuesta y no se pudo verificar
-  el inicio de sesión. No se afirma que se haya abierto una ventana.
-- Se verifica el hash SHA256 original de `bridge_server.py` y su diff vacío
+- La prueba con el mensaje `Prueba de conexiÃ³n desde Chat Fijo Gemini.
+  RespondÃ© solo: CONEXION_OK` queda pendiente: no hubo conexiÃ³n CDP, no se
+  enviÃ³ ningÃºn mensaje, no se recibiÃ³ una respuesta y no se pudo verificar
+  el inicio de sesiÃ³n. No se afirma que se haya abierto una ventana.
+- Se verifica el hash SHA256 original de `bridge_server.py` y su diff vacÃ­o
   antes del commit. Solo se incluyen el BAT nuevo, `.gitignore` y este registro.
 
 
-## 2026-11-23 — Carga, STOP, modelos web y arranque condicional
+## 2026-11-23 â€” Carga, STOP, modelos web y arranque condicional
 
 - **`chat_fijo_gemini.py`:** espera `domcontentloaded` y hasta 5 segundos de
   `networkidle` (si la red persistente impide ese estado, exige editor visible,
-  habilitado y editable y ausencia de generación). Espera hasta 15 segundos una
-  generación anterior, sin cancelarla; estabiliza 2 segundos antes de escribir y
-  vuelve a validar editor, URL y STOP. Conserva borradores y no reenvía errores.
-- STOP revisa aria-label, title y texto, excluyendo audio, voz, voice, micrófono,
+  habilitado y editable y ausencia de generaciÃ³n). Espera hasta 15 segundos una
+  generaciÃ³n anterior, sin cancelarla; estabiliza 2 segundos antes de escribir y
+  vuelve a validar editor, URL y STOP. Conserva borradores y no reenvÃ­a errores.
+- STOP revisa aria-label, title y texto, excluyendo audio, voz, voice, micrÃ³fono,
   mic, escuchar y listen. Solo devuelve texto de una respuesta nueva con STOP
-  ausente y contenido estable durante al menos 3 segundos, sin exigir botón copiar.
+  ausente y contenido estable durante al menos 3 segundos, sin exigir botÃ³n copiar.
 - Abre el selector web si existe y prioriza Pro/Ultra/Advanced, luego Thinking o
-  Análisis más profundo/4 Neon, luego Fast/Flash/Rápido o Ayuda todos los días/4
-  Hydrogen; descarta opciones deshabilitadas, agotadas o de suscripción.
-  Si los nombres son desconocidos, conserva el orden del menú disponible.
+  AnÃ¡lisis mÃ¡s profundo/4 Neon, luego Fast/Flash/RÃ¡pido o Ayuda todos los dÃ­as/4
+  Hydrogen; descarta opciones deshabilitadas, agotadas o de suscripciÃ³n.
+  Si los nombres son desconocidos, conserva el orden del menÃº disponible.
   Confirma la etiqueta seleccionada. `--json-result` agrega modelo y notas al
-  resultado; stderr informa MODELO_WEB también ante errores. No fuerza modelos
-  de Cascada AG ni promete disponibilidad posterior al envío.
+  resultado; stderr informa MODELO_WEB tambiÃ©n ante errores. No fuerza modelos
+  de Cascada AG ni promete disponibilidad posterior al envÃ­o.
 - **`sync_y_arrancar.bat`:** chequeo TCP de 1 segundo; llama al lanzador Gemini
-  únicamente si 127.0.0.1:9222 no escucha y conserva el arranque del sincronizador.
+  Ãºnicamente si 127.0.0.1:9222 no escucha y conserva el arranque del sincronizador.
 - **`scripts/sync_silencioso.vbs`:** el modo startup ahora ejecuta ese BAT sin
   ventana. La entrada existente DosAgentesSync del Registro ya usa este VBS;
-  el modo periódico conserva su comando anterior. No se relanzaron servicios.
+  el modo periÃ³dico conserva su comando anterior. No se relanzaron servicios.
 - **`test_chat_fijo_gemini.py`:** 17 pruebas aprobadas: incluyen estabilidad sin
-  botón copiar y selección por prioridad/cuota. Pruebas DOM separadas contra el
-  navegador existente: 10 casos STOP/audio/oculto y menú sintético que descarta
-  Pro agotado y selecciona Análisis más profundo; todos aprobados. El VBS se
-  verificó sustituyendo temporalmente Run por Echo en un archivo local ignorado;
+  botÃ³n copiar y selecciÃ³n por prioridad/cuota. Pruebas DOM separadas contra el
+  navegador existente: 10 casos STOP/audio/oculto y menÃº sintÃ©tico que descarta
+  Pro agotado y selecciona AnÃ¡lisis mÃ¡s profundo; todos aprobados. El VBS se
+  verificÃ³ sustituyendo temporalmente Run por Echo en un archivo local ignorado;
   el chequeo TCP omite Chrome con 9222 abierto y detecta un puerto cerrado.
 - Prueba real solicitada contra DOS_AGENTES con el mensaje exacto
-  `Prueba de conexión desde Chat Fijo Gemini. Respondé solo: CONEXION_OK`:
-  CDP 9222 respondió. La URL guardada sigue siendo
+  `Prueba de conexiÃ³n desde Chat Fijo Gemini. RespondÃ© solo: CONEXION_OK`:
+  CDP 9222 respondiÃ³. La URL guardada sigue siendo
   `https://gemini.google.com/app/ebb372bdb46e6358?hl=es_419`, pero Gemini la
   redirige a `/app`. Se detuvo antes de seleccionar modelo o enviar el mensaje;
-  no hubo respuesta de Gemini ni se sustituyó la URL de config_chats. No se
-  atribuye la redirección a una causa no verificada. La prueba anterior a estos
-  parches sí envió el mensaje y agotó 120 segundos; no se reenvió automáticamente.
-- Diff vacío y SHA256 original conservado en `bridge_server.py`,
+  no hubo respuesta de Gemini ni se sustituyÃ³ la URL de config_chats. No se
+  atribuye la redirecciÃ³n a una causa no verificada. La prueba anterior a estos
+  parches sÃ­ enviÃ³ el mensaje y agotÃ³ 120 segundos; no se reenviÃ³ automÃ¡ticamente.
+- Diff vacÃ­o y SHA256 original conservado en `bridge_server.py`,
   `consultar_gemini.py` y `bucle_autonomo.py`. Sin cambios al MCP ni a las reglas.
 
-Referencia: [Playwright — estados de carga](https://playwright.dev/python/docs/api/class-page#page-wait-for-load-state)
+Referencia: [Playwright â€” estados de carga](https://playwright.dev/python/docs/api/class-page#page-wait-for-load-state)
 y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 
 
-## 2026-11-23 — Chat fijo para la cuenta nueva y persistencia automática
+## 2026-11-23 â€” Chat fijo para la cuenta nueva y persistencia automÃ¡tica
 
 - **`abrir_chrome_gemini.bat`:** la URL inicial ahora es
   `https://gemini.google.com/app`, sin el ID de la cuenta anterior. Conserva
-  detección de Chrome/Edge, perfil dedicado y CDP 9222.
-- **`chat_fijo_gemini.py`:** un proyecto sin URL (fila ausente, NULL, vacía o
+  detecciÃ³n de Chrome/Edge, perfil dedicado y CDP 9222.
+- **`chat_fijo_gemini.py`:** un proyecto sin URL (fila ausente, NULL, vacÃ­a o
   `/app`) prepara un chat nuevo. Una URL fija que redirige a `/app` antes del
-  envío también habilita esa creación. Cada proyecto tiene su propio chat;
+  envÃ­o tambiÃ©n habilita esa creaciÃ³n. Cada proyecto tiene su propio chat;
   deja de heredar la URL de DOS_AGENTES para proyectos no registrados.
-  La preparación conserva espera de carga/editor, estabilización de 2 segundos,
-  selección del mejor modelo habilitado, STOP sin audio y respuesta estable 3 s.
-- Después de un único envío, reconoce la transición `/app` a `/app/ID` y guarda
-  únicamente una URL fija HTTPS válida en `config_chats`, asociada al proyecto.
-  Guarda el ID apenas aparece para no perder el vínculo si la generación tarda;
-  solo devuelve éxito cuando hay respuesta completa y URL persistida. No guarda
+  La preparaciÃ³n conserva espera de carga/editor, estabilizaciÃ³n de 2 segundos,
+  selecciÃ³n del mejor modelo habilitado, STOP sin audio y respuesta estable 3 s.
+- DespuÃ©s de un Ãºnico envÃ­o, reconoce la transiciÃ³n `/app` a `/app/ID` y guarda
+  Ãºnicamente una URL fija HTTPS vÃ¡lida en `config_chats`, asociada al proyecto.
+  Guarda el ID apenas aparece para no perder el vÃ­nculo si la generaciÃ³n tarda;
+  solo devuelve Ã©xito cuando hay respuesta completa y URL persistida. No guarda
   `/app` como URL fija. El resultado JSON incluye `url`, `model` y `response`.
-  Login u otra navegación inesperada detienen el flujo sin reenvío automático.
-- Persistencia SQLite acotada al proyecto, conexión mode=rw (sin crear bases
-  faltantes), transacción y comparación de URL previa para no sobrescribir
+  Login u otra navegaciÃ³n inesperada detienen el flujo sin reenvÃ­o automÃ¡tico.
+- Persistencia SQLite acotada al proyecto, conexiÃ³n mode=rw (sin crear bases
+  faltantes), transacciÃ³n y comparaciÃ³n de URL previa para no sobrescribir
   cambios de otro proceso. Bloqueo por proyecto desde antes de releer la
-  configuración: funciona aunque todavía no exista URL y aunque cambie el ID.
+  configuraciÃ³n: funciona aunque todavÃ­a no exista URL y aunque cambie el ID.
 - **`piloto_gemini.py`:** parche puntual para usar ese bloqueo por proyecto y
-  releer la configuración dentro del bloqueo. No cambia la ejecución de Codex
+  releer la configuraciÃ³n dentro del bloqueo. No cambia la ejecuciÃ³n de Codex
   ni el protocolo de cierre del piloto.
-- **`estado_puente.db` (local, excluido de Git):** se limpió exclusivamente la
-  URL vieja de DOS_AGENTES (`ebb372bdb46e6358`). La prueba real creó y guardó
+- **`estado_puente.db` (local, excluido de Git):** se limpiÃ³ exclusivamente la
+  URL vieja de DOS_AGENTES (`ebb372bdb46e6358`). La prueba real creÃ³ y guardÃ³
   `https://gemini.google.com/app/01a343165a8505af` en esa misma fila. No se
-  borraron otras filas ni se cambió el esquema. La base y el perfil no se suben.
+  borraron otras filas ni se cambiÃ³ el esquema. La base y el perfil no se suben.
 - **`test_chat_fijo_gemini.py`:** 21 pruebas aprobadas; cubren proyecto nuevo
-  sin herencia, persistencia y reutilización, NULL y `/app`, rechazo de URL
-  base/no válida, conflicto concurrente, transición de URL antes/después del
-  envío, login, respuesta estable y cuota/modelos, además del piloto existente.
-- **Prueba real solicitada:** CDP 9222 respondió. Se envió una sola vez
-  `Prueba de conexión desde Chat Fijo Gemini. Respondé solo: CONEXION_OK`.
+  sin herencia, persistencia y reutilizaciÃ³n, NULL y `/app`, rechazo de URL
+  base/no vÃ¡lida, conflicto concurrente, transiciÃ³n de URL antes/despuÃ©s del
+  envÃ­o, login, respuesta estable y cuota/modelos, ademÃ¡s del piloto existente.
+- **Prueba real solicitada:** CDP 9222 respondiÃ³. Se enviÃ³ una sola vez
+  `Prueba de conexiÃ³n desde Chat Fijo Gemini. RespondÃ© solo: CONEXION_OK`.
   Modelo web confirmado: **Neon**. Respuesta exacta completa: **CONEXION_OK**.
-  Se verificó luego que preparar otra conexión reutiliza la URL fija guardada,
+  Se verificÃ³ luego que preparar otra conexiÃ³n reutiliza la URL fija guardada,
   sin enviar otra consulta ni crear otro chat.
-- Se conservan los hashes originales y diff vacío de `bridge_server.py`,
-  `consultar_gemini.py` y `bucle_autonomo.py`. No se cambió Cascada AG ni el MCP.
+- Se conservan los hashes originales y diff vacÃ­o de `bridge_server.py`,
+  `consultar_gemini.py` y `bucle_autonomo.py`. No se cambiÃ³ Cascada AG ni el MCP.
 
-## 2026-11-23 — Cascada AG y arranque invisible de Windows
+## 2026-11-23 â€” Cascada AG y arranque invisible de Windows
 
-- `config_compartida/AGENTS.md`: denominación y cierre obligatorios actualizados
+- `config_compartida/AGENTS.md`: denominaciÃ³n y cierre obligatorios actualizados
   a Cascada AG 8765; 8765/8045 se llama siempre Cascada AG, nunca Puente.
-  Copia idéntica aplicada a `C:\dos_agentes_local\AGENTS.md` y
-  `C:\Users\H_P\.codex\AGENTS.md`. El identificador técnico del MCP se conserva.
+  Copia idÃ©ntica aplicada a `C:\dos_agentes_local\AGENTS.md` y
+  `C:\Users\H_P\.codex\AGENTS.md`. El identificador tÃ©cnico del MCP se conserva.
 - Nuevo `abrir_chrome_gemini_oculto.bat`: detecta Chrome y luego Edge, verifica
   TCP 9222 antes de abrir y usa --headless=new, perfil dedicado,
-  --no-first-run y --no-default-browser-check. Espera de conexión acotada a 15 s.
+  --no-first-run y --no-default-browser-check. Espera de conexiÃ³n acotada a 15 s.
 - Nuevo `arrancar_todo_oculto.vbs`: ejecuta el BAT del navegador y luego
   `sync_y_arrancar.bat` mediante WScript.Shell.Run con ventana 0.
 - `sync_y_arrancar.bat`: comprueba 127.0.0.1:9222 y llama al lanzador oculto
-  solo si el puerto no está escuchando; mantiene el sincronizador existente.
-- Inicio de sesión del usuario registrado mediante el acceso directo
+  solo si el puerto no estÃ¡ escuchando; mantiene el sincronizador existente.
+- Inicio de sesiÃ³n del usuario registrado mediante el acceso directo
   `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\DosAgentesInicioOculto.lnk`
   a `wscript.exe //B //Nologo "C:\dos_agentes_local\arrancar_todo_oculto.vbs"`.
-  Se retiró únicamente la entrada anterior DosAgentesSync del Registro HKCU Run
-  para evitar el arranque duplicado. La instalación es local a esta PC.
-- Verificación: VBS válido y ambas llamadas con ventana 0; detección y flags
+  Se retirÃ³ Ãºnicamente la entrada anterior DosAgentesSync del Registro HKCU Run
+  para evitar el arranque duplicado. La instalaciÃ³n es local a esta PC.
+- VerificaciÃ³n: VBS vÃ¡lido y ambas llamadas con ventana 0; detecciÃ³n y flags
   comprobados mediante lanzamiento simulado; con 9222 abierto el BAT termina
-  correctamente sin lanzar otro navegador. Tres AGENTS idénticos. La sesión
+  correctamente sin lanzar otro navegador. Tres AGENTS idÃ©nticos. La sesiÃ³n
   actual de Chrome se conserva; el modo headless queda configurado para el
-  próximo inicio, sin cerrar la sesión existente durante las pruebas.
+  prÃ³ximo inicio, sin cerrar la sesiÃ³n existente durante las pruebas.
 - `bridge_server.py`, `consultar_gemini.py` y `bucle_autonomo.py` mantienen sus
-  hashes originales y diff vacío; no se modificó el MCP ni Cascada AG.
+  hashes originales y diff vacÃ­o; no se modificÃ³ el MCP ni Cascada AG.
 # 2026-11-23 - Correccion de alcance del paquete v5 completo
 
 - Recuperado el ecosistema omitido de v4: cinco repos Git con bundles,
