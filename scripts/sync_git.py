@@ -206,7 +206,7 @@ def listening(port):
 def start_services():
     pythonw = Path(sys.executable).with_name('pythonw.exe')
     failures = []
-    for script, port in [('bridge_server.py', 8765), ('panel_web_ag/server.py', 8787)]:
+    for script, port in [('bridge_server.py', 8765), ('panel_control.py', 8787)]:
         if not listening(port):
             subprocess.Popen([str(pythonw), '-X', 'utf8', str(ROOT / script)], cwd=ROOT,
                              creationflags=FLAGS, stdin=subprocess.DEVNULL,
@@ -217,6 +217,10 @@ def start_services():
                 time.sleep(0.2)
         if not listening(port):
             failures.append(script)
+    # El monitor nuevo tiene mutex propio; el monitor de cuota sigue separado.
+    subprocess.Popen([str(pythonw), '-X', 'utf8', str(ROOT / 'tray_monitor.py')], cwd=ROOT,
+                     creationflags=FLAGS, stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     # PowerShell obtiene comandos completos sin dependencia de psutil.
     code, output = run(['powershell.exe', '-NoProfile', '-Command',
         "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'pythonw.exe' -and $_.CommandLine -like '*monitor_cuota.pyw*' }).Count"])
