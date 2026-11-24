@@ -48,7 +48,7 @@ def atomic(path, data):
 
 def rows(db, table, thread_id):
     # table is always selected from the constant allowlist, never from a bundle.
-    return [dict(r) for r in db.execute('SELECT * FROM ' + table + ' WHERE thread_id=?', (thread_id,))]
+    return sorted([dict(r) for r in db.execute('SELECT * FROM ' + table + ' WHERE thread_id=?', (thread_id,))], key=encoded)
 
 
 def dbpath(home, pattern):
@@ -98,6 +98,7 @@ def export_live(home, cloud, machine, state, temporary):
     manifest = {'format': FORMAT, 'machine': machine,
                 'created_at': datetime.now(timezone.utc).isoformat(), 'chats': []}
     published = 0
+    ready = missing = generating = 0
     with closing(sqlite3.connect(temporary / 'state.sqlite')) as db, \
          closing(sqlite3.connect(temporary / 'history.sqlite')) as history:
         db.row_factory = history.row_factory = sqlite3.Row
@@ -110,8 +111,10 @@ def export_live(home, cloud, machine, state, temporary):
                 not (thread.get('first_user_message') or thread.get('preview'))):
                 continue
             tables = {name: rows(history, name, thread_id) for name in TABLES}
-            busy = any(t['status'].replace('_', '').lower() in
-                       ('inprogress', 'running', 'pending', 'started') for t in tables['thread_turns'])
+            turns = tables['thread_turns']
+            latest = max(turns, key=lambda t: t['rollout_ordinal'], default=None)
+            busy = bool(latest and latest['status'].replace('_', '').lower() in
+                        ('inprogress', 'running', 'pending', 'started'))
             package = {'format': FORMAT, 'machine': machine, 'thread': thread,
                        'tables': tables, 'rollout': None, 'busy': busy,
                        'source_profile': str(home.parent)}
@@ -123,6 +126,7 @@ def export_live(home, cloud, machine, state, temporary):
                     # Old imports can refer to someone else's profile. Preserve
                     # their SQLite history without reading outside this home.
                     manifest['chats'].append({'id': thread_id, 'object': publish_package(cloud, package)})
+                    missing += 1
                     continue
                 if rollout.stat().st_size > MAX_OBJECT // 2:
                     raise ValueError('Rollout excede el limite de copia: ' + thread_id)
@@ -145,8 +149,16 @@ def export_live(home, cloud, machine, state, temporary):
                 atomic(output, gzip.compress(data, compresslevel=6, mtime=0))
                 published += 1
             manifest['chats'].append({'id': thread_id, 'object': key})
+            if package['rollout'] is None:
+                missing += 1
+            elif package['busy']:
+                generating += 1
+            else:
+                ready += 1
     atomic(cloud / 'machines' / (machine + '.json'), encoded(manifest))
-    return {'exported_chats': len(manifest['chats']), 'new_objects': published}
+    return {'exported_chats': len(manifest['chats']), 'new_objects': published,
+            'ready_versions': ready, 'archived_sqlite_only': missing,
+            'generating_versions': generating, 'transport': 'Drive; subida remota no verificada'}
 
 
 def columns(db, table):
@@ -193,7 +205,7 @@ def import_version(home, package, key, ledger, default_cwd, baselines=None):
     rollout = home / 'sessions' / 'sync' / ('rollout-' + stamp + '-' + new_id + '.jsonl')
     raw = (validate_rollout(base64.b64decode(package['rollout'], validate=True), source_id, new_id)
            if package['rollout'] is not None else None)
-    expected_tables = {table: [dict(row, thread_id=new_id) for row in package['tables'][table]] for table in TABLES}
+    expected_tables = {table: sorted([dict(row, thread_id=new_id) for row in package['tables'][table]], key=encoded) for table in TABLES}
     baseline = history_fingerprint(expected_tables, base64.b64encode(raw).decode('ascii') if raw else None)
     thread = dict(source, id=new_id, rollout_path=str(rollout), is_pinned=0,
                   project_id=None, thread_section_id=None, attached_thread_parent_id=None)

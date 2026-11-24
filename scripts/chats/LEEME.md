@@ -1,49 +1,59 @@
-# Chats independientes entre PCs
+# Chats independientes con Codex abierto
 
-Cada PC mantiene su propia carpeta `.codex`. Drive transporta sesiones; no se
-comparte ni reemplaza la base SQLite activa. Las credenciales no se copian.
-PC1 puede apagarse una vez que la subida terminó y Drive propagó los archivos.
+`sync_chats_abierto.py` replica conversaciones mediante Drive sin cerrar Codex.
+Cada PC conserva su perfil local. La tarea `CodexChatsSyncLive` corre sin ventana
+al iniciar sesion y cada dos minutos. En PC1 esta activa; `CodexChatsSyncCold`
+queda deshabilitada como respaldo. No ejecutar ambas tareas simultaneamente.
 
-`setup_chats.ps1` instala la versión auditada de codexSync sin activar copias.
-Ejecutarlo en cada PC con su ruta real de Drive y un `-MachineId` distinto.
-Requiere Python 3.14 o posterior; no usar el mismo identificador en dos PCs.
-Después, `activar_sync_chats.ps1` registra `CodexChatsSyncCold`: inicio de sesión
-y cada diez minutos, con pythonw y sin ventana. No cierra Codex automáticamente.
-La tarea solo puede sincronizar con Codex completamente cerrado. Los cambios
-descargados aparecen en la próxima apertura. Abrir la app antes de que termine
-la copia puede aplazar la sincronización; no equivale a sincronización en vivo.
+El exportador usa backups SQLite y copia lineas completas de los rollouts.
+Cada snapshot de base es consistente individualmente; no son una transaccion
+conjunta entre bases y archivos. Publica objetos inmutables con SHA256 en
+`CodexSync/live-v1/objects` y un manifiesto por PC. No publica bases completas,
+configuracion, auth.json ni perfiles de navegador. Los historiales contienen
+conversaciones privadas: mantener esta carpeta de Drive privada y fuera de Git.
 
-En PC1, la tarea recibe además la política local `recovery-acceptance-PC1.json`.
-Reconoce únicamente los 111 rollouts que ya faltaban: conserva el ZIP de respaldo,
-los diez historiales exportados y exige que sus diez continuaciones tengan
-rollouts nativos. No inventa las sesiones originales. Nuevos faltantes bloquean
-la copia. No copiar esta excepción a otras PCs como si sus bases fueran iguales.
+En destino inserta versiones terminadas con identificadores nuevos, sin
+reemplazar bases ni actualizar/eliminar conversaciones existentes. Sus nombres
+llevan `[sync PC1]` (o el origen correspondiente). Continuar una copia publica
+esa continuacion; las copias intactas no se reexportan. Nuevos avances generan
+nuevas versiones y pueden aparecer varios chats: no fusiona ediciones paralelas.
+La actualizacion inmediata del panel de otra PC aun no esta verificada.
 
-`recuperar_huerfanos.py` exporta los historiales de usuario desde un respaldo
-SQLite verificado; `preparar_continuaciones.py` genera contexto y extractos de
-relevo. Sus resultados privados están fuera del repositorio, en Drive. Los chats
-de continuación tienen identificadores nuevos; los originales se mantienen.
+Las generaciones pendientes se conservan y se revisan en ciclos posteriores,
+sin enviar mensajes ni ejecutar modelos. Los historiales presentes solo en
+SQLite se archivan, sin fabricar rollouts: no pueden reanudarse fielmente como
+el original. Los diez historiales afectados ya tienen exportacion completa y
+diez continuaciones nativas con contexto recuperado. Originales y ZIP de
+respaldo se conservan en la carpeta privada de Drive.
 
-Los conflictos se detienen con `manual_abort`, conservando las dos versiones.
-Evitar editar el mismo chat en dos PCs antes de sincronizar. No promete fusionar
-automáticamente dos ramas distintas de una conversación.
+## Activacion en PC2 y PC3
 
-Estado: `%LOCALAPPDATA%\CodexSync\automatic-sync-status.json`.
-Registro: `%LOCALAPPDATA%\CodexSync\logs\automatic-sync.log`.
-`waiting_codex_closed` es espera normal; `synchronized` indica copia terminada;
-`conflict_preserved`, `core_error` o `blocked` requieren revisión del registro.
-Drive debe terminar su propia subida antes de apagar la PC de origen.
+Requiere scripts actualizados, Python 3.14+, iniciar sesion en Codex e iniciar un
+chat para crear ambas bases nativas. Drive debe sincronizar la misma carpeta.
+Usar un MachineId diferente por PC. El activador no requiere cerrar Codex.
 
-Cerrar la ventana puede dejar la app en la bandeja: usar Salir/Quit. Incluso
-despues de salir pueden persistir reportadores de fallos `crashpad-handler`.
-`limpiar_crashpad_huerfanos.py` comprueba ruta MSIX de Codex, argumentos, arbol
-de padres y fechas. Solo retira reportadores sin ancestro activo, observados
-como huerfanos durante al menos dos minutos. Los handles se fijan y validan
-antes de terminar procesos para evitar confundir PIDs reutilizados. No termina
-la aplicacion, servidores, renderizadores ni arboles desconocidos/mixtos.
-El control original del core sigue verificando que Codex este cerrado.
-Por el periodo de observacion, un cierre puede requerir dos ciclos de tarea.
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\dos_agentes_local\scripts\chats\activar_sync_abierto.ps1 -MachineId PC2 -CloudRoot "I:\Mi unidad\CodexSync\live-v1"
+```
 
-La prueba local de transferencia de los diez chats de continuación utilizó un
-CODEX_HOME separado, sin credenciales ni SQLite original: lectura y reanudación
-10/10 correctas, sin inferencia. Falta validar la descarga en las PCs 2 y 3.
+En PC3 usar `-MachineId PC3`. Ajustar CloudRoot a su ruta real de Drive. Si Python
+esta en otra ruta, pasar `-PythonExecutable` con su pythonw.exe.
+PC2 y PC3 aun no fueron configuradas ni verificadas fisicamente.
+PC1 puede apagarse cuando termine el ciclo Y Drive complete su subida; publicar
+archivos en la carpeta local no demuestra su propagacion remota.
+
+## Estado y pruebas
+
+Estado: `%LOCALAPPDATA%\CodexSync\live-sync-status.json`.
+`synchronized_live`: ciclo local terminado, no certifica la subida de Drive.
+`partial_live`: conserva objetos pendientes y su causa. Un esquema incompatible
+requiere revisar compatibilidad. `blocked`: conserva el error. No sustituye
+la prueba de descarga real en otra PC.
+
+`test_sync_chats_abierto.py`: nueve pruebas de offsets/CRLF, idempotencia,
+generaciones pendientes, ausencia de rollout, truncado, incompatibilidad,
+integridad, importacion entre perfiles abiertos y continuaciones sin ecos.
+Las pruebas nativas usan CODEX_HOME separado sin credenciales, mediante
+thread/read y thread/resume; no solicitan inferencia ni alteran el perfil activo.
+Los scripts anteriores en frio se conservan como respaldo desactivado; el modo
+nuevo no depende de limpiar ni terminar procesos de Codex.
