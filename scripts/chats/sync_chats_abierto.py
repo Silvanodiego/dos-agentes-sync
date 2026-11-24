@@ -12,12 +12,16 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import sys
 import tempfile
 import time
 import uuid
 
 from backup_chats import _snapshot_sqlite, _snapshot_jsonl
 from coverage_chats import normalize_windows_path
+from proyectos_portables import catalog, project_for, portable_path, local_path, ProjectRegistry
+import continuidad_chats as continuity
+from rutas_historial import relocate
 
 TABLES = ('thread_turns', 'thread_items', 'thread_realtime_items', 'thread_history_projection_state')
 MAX_OBJECT = 256 * 1024 * 1024
@@ -102,6 +106,8 @@ def export_live(home, cloud, machine, state, temporary):
     with closing(sqlite3.connect(temporary / 'state.sqlite')) as db, \
          closing(sqlite3.connect(temporary / 'history.sqlite')) as history:
         db.row_factory = history.row_factory = sqlite3.Row
+        projects, project_lookup, assignments = catalog(home, cloud, db)
+        manifest['projects'] = projects
         for row in db.execute("SELECT * FROM threads ORDER BY id"):
             thread = dict(row)
             thread_id = thread['id']
@@ -118,6 +124,8 @@ def export_live(home, cloud, machine, state, temporary):
             package = {'format': FORMAT, 'machine': machine, 'thread': thread,
                        'tables': tables, 'rollout': None, 'busy': busy,
                        'source_profile': str(home.parent)}
+            package['project'] = project_for(thread, project_lookup, assignments, home, cloud)
+            package['workspace'] = portable_path(thread['cwd'], home, cloud)
             rollout = Path(normalize_windows_path(thread['rollout_path']))
             if rollout.suffix == '.jsonl' and rollout.is_file() and not rollout.is_symlink():
                 resolved = rollout.resolve()
@@ -140,6 +148,23 @@ def export_live(home, cloud, machine, state, temporary):
             fingerprint = history_fingerprint(tables, package['rollout'])
             if baselines.get(thread_id) == fingerprint:
                 continue
+            package['lineage'] = continuity.export_lineage(thread_id, fingerprint, state, machine)
+            previous = state.get('local_revisions', {}).get(thread_id)
+            binding = digest(encoded([package['project'], package['workspace']]))
+            if previous and previous.get('binding') != binding:
+                package['lineage']['ancestors'] = list(dict.fromkeys(package['lineage']['ancestors'] + [previous['key']]))
+            if previous and previous.get('fingerprint') == fingerprint and previous.get('binding') == binding:
+                # Archiving an old local version must not publish a fresh head.
+                read_object(cloud, previous['key'])
+                key = previous['key']
+                manifest['chats'].append({'id': thread_id, 'object': key})
+                if package['rollout'] is None:
+                    missing += 1
+                elif package['busy']:
+                    generating += 1
+                else:
+                    ready += 1
+                continue
             data = encoded(package)
             if len(data) > MAX_OBJECT:
                 raise ValueError('Historial excede el limite por objeto: ' + thread_id)
@@ -148,6 +173,8 @@ def export_live(home, cloud, machine, state, temporary):
             if not output.exists():
                 atomic(output, gzip.compress(data, compresslevel=6, mtime=0))
                 published += 1
+            continuity.remember_export(thread_id, fingerprint, key, package['lineage'], state)
+            state['local_revisions'][thread_id]['binding'] = binding
             manifest['chats'].append({'id': thread_id, 'object': key})
             if package['rollout'] is None:
                 missing += 1
@@ -156,7 +183,7 @@ def export_live(home, cloud, machine, state, temporary):
             else:
                 ready += 1
     atomic(cloud / 'machines' / (machine + '.json'), encoded(manifest))
-    return {'exported_chats': len(manifest['chats']), 'new_objects': published,
+    return {'exported_chats': len(manifest['chats']), 'exported_projects': len(projects), 'new_objects': published,
             'ready_versions': ready, 'archived_sqlite_only': missing,
             'generating_versions': generating, 'transport': 'Drive; subida remota no verificada'}
 
@@ -191,11 +218,12 @@ def validate_rollout(raw, source_id, new_id):
     return b''.join(lines)
 
 
-def import_version(home, package, key, ledger, default_cwd, baselines=None):
+def import_version(home, package, key, ledger, default_cwd, baselines=None, registry=None):
     """New IDs only: no update/delete of any existing local thread or history."""
     if package['busy'] or package['rollout'] is None:
         return 'preserved_only'
     source = package['thread']
+    continuity.validate(package)
     source_id = str(uuid.UUID(source['id']))
     # Deterministic version ID: repeat runs and interrupted imports are idempotent.
     new_id = str(uuid.uuid5(uuid.NAMESPACE_URL, FORMAT + ':' + package['machine'] + ':' + source_id + ':' + key))
@@ -205,29 +233,47 @@ def import_version(home, package, key, ledger, default_cwd, baselines=None):
     rollout = home / 'sessions' / 'sync' / ('rollout-' + stamp + '-' + new_id + '.jsonl')
     raw = (validate_rollout(base64.b64decode(package['rollout'], validate=True), source_id, new_id)
            if package['rollout'] is not None else None)
-    expected_tables = {table: sorted([dict(row, thread_id=new_id) for row in package['tables'][table]], key=encoded) for table in TABLES}
-    baseline = history_fingerprint(expected_tables, base64.b64encode(raw).decode('ascii') if raw else None)
     thread = dict(source, id=new_id, rollout_path=str(rollout), is_pinned=0,
                   project_id=None, thread_section_id=None, attached_thread_parent_id=None)
-    thread['name'] = (source.get('name') or source['title']) + ' [sync ' + package['machine'] + ']'
-    if not Path(thread['cwd']).is_dir():
-        thread['cwd'] = str(default_cwd)
+    name = re.sub(r'(?: \[sync [A-Za-z0-9_-]+\])+$', '', source.get('name') or source['title'])
+    thread['name'] = name + ' [sync ' + package['machine'] + ']'
+    if registry is not None:
+        workspace = package.get('workspace')
+        cwd = local_path(workspace, home, registry.cloud, registry.mappings) if workspace else Path(thread['cwd'])
+        if not cwd.is_dir():
+            raise ValueError('Carpeta del chat pendiente de Drive/mapeo: ' + str(cwd))
+        thread['cwd'] = str(cwd)
+        if package.get('project'):
+            thread['project_id'] = registry.resolve(package['project'])
+    elif not Path(thread['cwd']).is_dir():
+        raise ValueError('Carpeta del chat ausente; no se vincula a una carpeta ajena')
+    tables = package['tables']
+    if raw is not None:
+        raw, tables = relocate(raw, tables, source['cwd'], thread['cwd'])
+    expected_tables = {table: sorted([dict(row, thread_id=new_id) for row in tables[table]], key=encoded) for table in TABLES}
+    baseline = history_fingerprint(expected_tables, base64.b64encode(raw).decode('ascii') if raw else None)
     # Stage file first, history second, visibility row last. A crash can leave
     # an invisible staged replica, never a half-replaced existing conversation.
     with closing(sqlite3.connect(state_path, timeout=5)) as db, \
          closing(sqlite3.connect(history_path, timeout=5)) as history:
         existing = db.execute('SELECT rollout_path FROM threads WHERE id=?', (new_id,)).fetchone()
         if existing:
-            if str(rollout) != existing[0]:
+            # Native resume may relocate a canonical rollout. Verify its bytes.
+            existing_path = Path(normalize_windows_path(existing[0]))
+            if (not existing_path.resolve().is_relative_to(home.resolve()) or
+                existing_path.is_symlink() or not existing_path.is_file() or
+                existing_path.read_bytes() != raw):
                 raise ValueError('Colision de identidad; no se modifica el chat existente')
             ledger.add(new_id)
             if baselines is not None:
                 baselines.setdefault(new_id, baseline)
+            if registry is not None:
+                continuity.identity(package, key, new_id, registry.state)
             return 'already_imported'
         if set(columns(db, 'threads')) != set(thread):
             raise ValueError('Version de esquema incompatible: threads')
         for table in TABLES:
-            for row in package['tables'][table]:
+            for row in tables[table]:
                 if row.get('thread_id') != source_id or set(columns(history, table)) != set(row):
                     raise ValueError('Esquema/identidad de historial incompatible')
         if raw is None:
@@ -242,7 +288,7 @@ def import_version(home, package, key, ledger, default_cwd, baselines=None):
             # after a crash. Verify, never overwrite previously staged rows.
             history.row_factory = sqlite3.Row
             for table in TABLES:
-                expected = [dict(row, thread_id=new_id) for row in package['tables'][table]]
+                expected = [dict(row, thread_id=new_id) for row in tables[table]]
                 previous = rows(history, table, new_id)
                 if previous:
                     if sorted(map(encoded, previous)) != sorted(map(encoded, expected)):
@@ -255,10 +301,12 @@ def import_version(home, package, key, ledger, default_cwd, baselines=None):
         ledger.add(new_id)
         if baselines is not None:
             baselines[new_id] = baseline
+        if registry is not None:
+            continuity.identity(package, key, new_id, registry.state)
     return 'imported'
 
 
-def sync_once(home, cloud, machine, state_path, default_cwd):
+def sync_once(home, cloud, machine, state_path, default_cwd, registry_factory=ProjectRegistry):
     if not re.fullmatch(r'[A-Za-z0-9_-]{1,40}', machine):
         raise ValueError('Identificador de PC invalido')
     state = json.loads(state_path.read_text(encoding='utf-8')) if state_path.exists() else {}
@@ -266,41 +314,62 @@ def sync_once(home, cloud, machine, state_path, default_cwd):
     accepted = set(state.get('accepted_objects', []))
     baselines = state.setdefault('import_baselines', {})
     result = {'status': 'synchronized_live', 'requires_codex_closed': False,
-              'imported_versions': 0, 'preserved_only': 0, 'pending_objects': 0}
-    # Persist replica ownership before exporting so imports are never re-exported.
-    for manifest_path in sorted((cloud / 'machines').glob('*.json')):
-        if manifest_path.stem == machine:
-            continue
-        try:
-            manifest = json.loads(manifest_path.read_bytes())
-            if manifest['format'] != FORMAT or manifest['machine'] != manifest_path.stem:
-                raise ValueError('Manifiesto incompatible')
-            for chat in manifest['chats']:
-                key = chat['object']
-                if key in accepted:
-                    continue
-                try:
-                    package = read_object(cloud, key)
-                    if package['machine'] != manifest['machine'] or package['thread']['id'] != chat['id']:
-                        raise ValueError('Objeto no coincide con manifiesto')
-                    status = import_version(home, package, key, imported, default_cwd, baselines)
-                    if status in ('imported', 'already_imported'):
-                        accepted.add(key)
-                        result['imported_versions'] += status == 'imported'
-                    else:
-                        result['preserved_only'] += 1
-                    state.update(imported_ids=sorted(imported), accepted_objects=sorted(accepted))
-                    atomic(state_path, encoded(state))
-                except (OSError, ValueError, EOFError, KeyError, sqlite3.Error) as exc:
-                    result['pending_objects'] += 1
-                    result['last_pending_reason'] = type(exc).__name__ + ': ' + str(exc)
-        except (OSError, ValueError, KeyError) as exc:
-            result['pending_objects'] += 1
-            result['last_pending_reason'] = type(exc).__name__ + ': ' + str(exc)
+              'imported_versions': 0, 'preserved_only': 0, 'pending_objects': 0,
+              'registered_projects': 0, 'pending_projects': 0}
+    mapping_path = state_path.with_name('path-mappings.json')
+    mappings = json.loads(mapping_path.read_bytes()) if mapping_path.exists() else {}
+    registry = registry_factory(home, cloud, state, dbpath(home, 'state_[0-9]*.sqlite'), mappings)
+    try:
+        # Persist replica ownership before exporting so imports are never re-exported.
+        for manifest_path in sorted((cloud / 'machines').glob('*.json')):
+            if manifest_path.stem == machine:
+                continue
+            try:
+                manifest = json.loads(manifest_path.read_bytes())
+                if manifest['format'] != FORMAT or manifest['machine'] != manifest_path.stem:
+                    raise ValueError('Manifiesto incompatible')
+                for project in manifest.get('projects', []):
+                    try:
+                        registry.resolve(project)
+                        result['registered_projects'] += 1
+                    except (OSError, ValueError, KeyError, sqlite3.Error) as exc:
+                        result['pending_projects'] += 1
+                        result['last_project_reason'] = str(exc)
+                for chat in manifest['chats']:
+                    key = chat['object']
+                    if key in accepted:
+                        continue
+                    try:
+                        package = read_object(cloud, key)
+                        if package['machine'] != manifest['machine'] or package['thread']['id'] != chat['id']:
+                            raise ValueError('Objeto no coincide con manifiesto')
+                        status = import_version(home, package, key, imported, default_cwd, baselines, registry)
+                        if status in ('imported', 'already_imported'):
+                            accepted.add(key)
+                            result['imported_versions'] += status == 'imported'
+                        else:
+                            result['preserved_only'] += 1
+                        state.update(imported_ids=sorted(imported), accepted_objects=sorted(accepted))
+                        atomic(state_path, encoded(state))
+                    except (OSError, ValueError, EOFError, KeyError, sqlite3.Error) as exc:
+                        result['pending_objects'] += 1
+                        result['last_pending_reason'] = type(exc).__name__ + ': ' + str(exc)
+            except (OSError, ValueError, KeyError) as exc:
+                result['pending_objects'] += 1
+                result['last_pending_reason'] = type(exc).__name__ + ': ' + str(exc)
+    finally:
+        registry.close()
     with tempfile.TemporaryDirectory(prefix='codex-live-') as temporary:
         result.update(export_live(home, cloud, machine, state, Path(temporary)))
+    result['archived_predecessors'] = continuity.archive_superseded(home, state, sys.modules[__name__])
+    # Native DB registration does not guarantee that an already-running desktop
+    # refreshes its legacy sidebar. Report that distinction explicitly.
+    result['desktop_project_visibility'] = 'not_verified'
+    result['permissions'] = 'local_policy_preserved'
+    result['project_bindings'] = len(state.get('project_bindings', {}))
+    atomic(state_path, encoded(state))
     result['checked_at_utc'] = datetime.now(timezone.utc).isoformat()
-    if result['pending_objects']:
+    if result['pending_objects'] or result['pending_projects']:
         result['status'] = 'partial_live'
     atomic(state_path.with_name('live-sync-status.json'), encoded(result))
     return result

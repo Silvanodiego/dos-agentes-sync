@@ -12,10 +12,11 @@ import sqlite3
 import subprocess
 import threading
 import time
+from coverage_chats import normalize_windows_path
 
 
 def normalized(path):
-    return os.path.normcase(os.path.normpath(str(path)))
+    return os.path.normcase(os.path.normpath(normalize_windows_path(str(path))))
 
 
 def drive_root(cloud):
@@ -26,7 +27,7 @@ def drive_root(cloud):
 
 
 def portable_path(path, home, cloud):
-    path = Path(path)
+    path = Path(normalize_windows_path(str(path)))
     if not path.is_absolute():
         raise ValueError('Ruta de proyecto no absoluta')
     anchors = [('drive', drive_root(cloud)), ('profile', home.parent)]
@@ -98,7 +99,7 @@ def project_for(thread, lookup, assignments, home, cloud):
         return explicit
     # Legacy chats can predate project_id. Infer only an unambiguous longest root.
     matches = []
-    cwd = Path(thread['cwd'])
+    cwd = Path(normalize_windows_path(thread['cwd']))
     for project in {p['key']: p for p in lookup.values()}.values():
         for record in project['roots']:
             root = local_path(record, home, cloud)
@@ -183,6 +184,8 @@ class ProjectRegistry:
                     self.existing[roots] = pid
 
     def resolve(self, project):
+        if project.get('key') != project_key(project['roots']):
+            raise ValueError('Identidad de proyecto no coincide con sus carpetas')
         roots = [local_path(r, self.home, self.cloud, self.mappings) for r in project['roots']]
         if not roots or any(not p.is_dir() for p in roots):
             raise ValueError('Carpeta de proyecto pendiente de Drive/mapeo: ' + project['name'])

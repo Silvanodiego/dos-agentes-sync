@@ -1,18 +1,35 @@
 #requires -Version 5.1
 [CmdletBinding()]
 param(
-    [string]$CloudRoot = 'I:\Mi unidad\CodexSync\live-v1',
+    [string]$CloudRoot = '',
     [string]$MachineId = ($env:COMPUTERNAME + '-' + $env:USERNAME),
     [string]$CodexHome = (Join-Path $env:USERPROFILE '.codex'),
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'CodexSync'),
     [string]$PythonExecutable = 'C:\dos_agentes_local\.venv\Scripts\pythonw.exe'
 )
 $ErrorActionPreference = 'Stop'
+if (-not $CloudRoot) {
+    $candidates = @(
+        foreach ($drive in Get-PSDrive -PSProvider FileSystem) {
+            foreach ($folder in @('Mi unidad', 'My Drive')) {
+                $candidate = Join-Path $drive.Root ($folder + '\CodexSync\live-v1')
+                if (Test-Path -LiteralPath (Join-Path $candidate 'machines') -PathType Container) { $candidate }
+            }
+        }
+    ) | Select-Object -Unique
+    if (@($candidates).Count -ne 1) {
+        throw 'No se encuentra una unica carpeta compartida CodexSync/live-v1. Inicie Drive o especifique -CloudRoot con su ruta.'
+    }
+    $CloudRoot = @($candidates)[0]
+}
 $MachineId = $MachineId -replace '[^A-Za-z0-9_-]', '-'
 if ($MachineId.Length -gt 40) { throw 'MachineId debe tener como maximo 40 caracteres' }
 $worker = Join-Path $PSScriptRoot 'sync_chats_abierto.py'
 foreach ($file in @($worker, $PythonExecutable)) {
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Falta $file" }
+}
+foreach ($module in @('proyectos_portables.py', 'continuidad_chats.py', 'rutas_historial.py', 'backup_chats.py', 'coverage_chats.py')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $module) -PathType Leaf)) { throw "Falta el modulo $module; actualice el repositorio completo" }
 }
 foreach ($pattern in @('state_*.sqlite', 'thread_history_*.sqlite')) {
     if (@(Get-ChildItem -LiteralPath $CodexHome -Filter $pattern -File).Count -ne 1) {
