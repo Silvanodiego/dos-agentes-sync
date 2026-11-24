@@ -6,6 +6,8 @@ import unittest
 from unittest.mock import patch
 
 import sync_chats_cerrado as sync
+from limpiar_crashpad_huerfanos import eligible
+import limpiar_crashpad_huerfanos as crashpad
 
 
 class SyncTests(unittest.TestCase):
@@ -88,7 +90,8 @@ class SyncTests(unittest.TestCase):
 
     def test_core_receives_no_close_and_no_conflict_overwrite(self):
         with patch.object(sync, 'validate_config', return_value=self.home), \
-             patch.object(sync, 'check_coverage'), patch.object(sync.subprocess, 'run') as run:
+             patch.object(sync, 'check_coverage'), patch.object(sync, 'cleanup', return_value=[]), \
+             patch.object(sync.subprocess, 'run') as run:
             run.return_value.returncode = 3
             result = sync.execute(self.root, None, Path('python.exe'))
             command = run.call_args.args[0]
@@ -103,6 +106,47 @@ class SyncTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 sync.execute(self.root, None, Path('python.exe'))
             run.assert_not_called()
+
+
+class CrashpadTests(unittest.TestCase):
+    def record(self, pid, parent, kind='crashpad-handler', born=10, path=None):
+        return {'pid': pid, 'parent': parent, 'kind': kind, 'born': born,
+                'path': path or r'C:\Program Files\WindowsApps\OpenAI.Codex_26.1_x64__package\app\ChatGPT.exe'}
+
+    def test_only_orphan_handler_chain_selected(self):
+        rows = [self.record(1, 99), self.record(2, 1, born=11)]
+        self.assertEqual({p['pid'] for p in eligible(rows, r'C:\Program Files')}, {1, 2})
+
+    def test_active_application_tree_preserved(self):
+        rows = [self.record(1, 99, kind=''), self.record(2, 1, born=11)]
+        self.assertEqual(eligible(rows, r'C:\Program Files'), [])
+
+    def test_pid_reuse_preserved(self):
+        rows = [self.record(1, 99, born=20), self.record(2, 1, born=10)]
+        self.assertEqual(eligible(rows, r'C:\Program Files'), [])
+
+    def test_other_chatgpt_package_preserved(self):
+        rows = [self.record(1, 99, path=r'C:\Program Files\WindowsApps\OpenAI.ChatGPT_x\app\ChatGPT.exe')]
+        self.assertEqual(eligible(rows, r'C:\Program Files'), [])
+
+    def test_mixed_orphan_tree_preserved(self):
+        rows = [self.record(1, 99), self.record(2, 1, kind='utility')]
+        self.assertEqual(eligible(rows, r'C:\Program Files'), [])
+
+    def test_cycle_preserved(self):
+        rows = [self.record(1, 2), self.record(2, 1)]
+        self.assertEqual(eligible(rows, r'C:\Program Files'), [])
+
+    def test_first_observation_and_grace_never_terminate(self):
+        rows = [self.record(1, 99)]
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(crashpad, 'snapshot', return_value=rows), \
+             patch.object(crashpad.time, 'time', side_effect=[100.0, 150.0]), \
+             patch.dict(crashpad.os.environ, {'ProgramFiles': r'C:\Program Files'}), \
+             patch.object(crashpad.ctypes, 'WinDLL') as kernel:
+            self.assertEqual(crashpad.cleanup(Path(directory)), [])
+            self.assertEqual(crashpad.cleanup(Path(directory)), [])
+            kernel.assert_not_called()
 
 
 if __name__ == '__main__':

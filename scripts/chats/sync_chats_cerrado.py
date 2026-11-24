@@ -15,6 +15,7 @@ import tomllib
 
 from coverage_chats import (CoverageError, audit_source, classify_rollout,
                             locate_database, read_threads)
+from limpiar_crashpad_huerfanos import cleanup
 
 
 def sha256(path):
@@ -116,6 +117,7 @@ def validate_config(root):
 def execute(root, acceptance, python):
     home = validate_config(root)
     check_coverage(home, acceptance)
+    removed_handlers = cleanup(root)
     command = [str(python), str(root / 'codexsync.py'), '-c', str(root / 'codexsync.toml'),
                'sync', '--apply', '--unattended', '--conflict-policy', 'manual_abort']
     logs = root / 'logs'
@@ -126,7 +128,8 @@ def execute(root, acceptance, python):
         result = subprocess.run(command, stdout=output, stderr=subprocess.STDOUT,
                                 creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     statuses = {0: 'synchronized', 2: 'conflict_preserved', 3: 'waiting_codex_closed'}
-    return {'status': statuses.get(result.returncode, 'core_error'), 'exit_code': result.returncode}
+    return {'status': statuses.get(result.returncode, 'core_error'), 'exit_code': result.returncode,
+            'orphan_crashpad_removed': removed_handlers}
 
 
 def main():

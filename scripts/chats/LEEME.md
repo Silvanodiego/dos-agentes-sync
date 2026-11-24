@@ -34,6 +34,16 @@ Registro: `%LOCALAPPDATA%\CodexSync\logs\automatic-sync.log`.
 `conflict_preserved`, `core_error` o `blocked` requieren revisión del registro.
 Drive debe terminar su propia subida antes de apagar la PC de origen.
 
+Cerrar la ventana puede dejar la app en la bandeja: usar Salir/Quit. Incluso
+despues de salir pueden persistir reportadores de fallos `crashpad-handler`.
+`limpiar_crashpad_huerfanos.py` comprueba ruta MSIX de Codex, argumentos, arbol
+de padres y fechas. Solo retira reportadores sin ancestro activo, observados
+como huerfanos durante al menos dos minutos. Los handles se fijan y validan
+antes de terminar procesos para evitar confundir PIDs reutilizados. No termina
+la aplicacion, servidores, renderizadores ni arboles desconocidos/mixtos.
+El control original del core sigue verificando que Codex este cerrado.
+Por el periodo de observacion, un cierre puede requerir dos ciclos de tarea.
+
 La prueba local de transferencia de los diez chats de continuación utilizó un
 CODEX_HOME separado, sin credenciales ni SQLite original: lectura y reanudación
 10/10 correctas, sin inferencia. Falta validar la descarga en las PCs 2 y 3.
