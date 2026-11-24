@@ -75,5 +75,3 @@ config_backups/
 chrome_gemini_profile/
 
 /runtime/node-v24.22.3-win-x64/
-
-/runtime/node-v24.22.3-win-x64/
