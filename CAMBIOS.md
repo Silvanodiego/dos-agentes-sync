@@ -324,3 +324,14 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - Agregada la regla obligatoria en config_compartida/AGENTS.md y sincronizada en AGENTS.md local y %USERPROFILE%/.codex/AGENTS.md.
 - Ante bloqueo o riesgo, consultar al Chat Fijo Gemini para definir plan B; si hace falta decision del usuario, informar causa probable, solucion tecnica con comando/paso exacto y alternativa.
 - Verificadas las tres copias identicas y SHA256 de bridge_server.py y respaldos sin cambios.
+
+# 2026-11-24 - Preservacion de chats y preparacion de copias independientes
+
+- Nuevos scripts/chats/setup_chats.ps1, backup_chats.py, coverage_chats.py y paquete_historial.py. Instalan el core auditado codexSync (05084c7f67141105883df7c61a9b3eb9faa19661), respaldan sesiones comprimidas y SQLite con checksums, detectan rollouts faltantes y exportan un archivo portable saneado. No incluyen credenciales, config, settings globales ni remote_control_enrollments en el ZIP portable.
+- PC1: core instalado en %LOCALAPPDATA%/CodexSync; config validada con Python 3.14.7. Automatizacion e importacion permanecen desactivadas; no se reemplazaron bases activas ni se cerro Codex.
+- Respaldo local verificado: 1153 sesiones y 3 bases, 543750443 bytes. Las bases son snapshots consistentes individualmente; no son una transaccion conjunta con Codex abierto.
+- Auditoria: 111 threads sin rollout (10 conversaciones de usuario, 98 revisiones y 3 subagentes). has_user_event=0 NO identifica conversaciones prescindibles.
+- Prueba con binario exacto de Desktop y CODEX_HOME temporal sin auth: chat normal thread/read y thread/resume OK (10 turnos); chat sin rollout falla missing source rollout / no rollout found. SQLite conserva contenido, pero no basta para reanudar fielmente los 10. No se crearon historiales sinteticos.
+- Comando preparacion otras PCs (ajustar CloudRoot a su unidad Drive): powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\dos_agentes_local\scripts\chats\setup_chats.ps1 -CloudRoot "I:\Mi unidad\CodexSync". Requiere Python 3.14+ y carpeta sync existente. Este comando prepara, NO activa sincronizacion.
+- Pendiente decision del usuario: conservar los 10 historiales afectados y continuarlos en chats nuevos, o esperar recuperar sus rollouts originales. No se anuncia sincronizacion completa mientras falten archivos y validacion en PC2/PC3.
+- Cascada AG no se modifico. Chat Fijo Gemini no envio consulta: detecto un borrador previo y lo conservo. Segunda auditoria Cascada AG fallo HTTP502; no se reintento inferencia; adaptador agy verificado.
