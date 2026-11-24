@@ -1,5 +1,26 @@
 # Registro de cambios
 
+## 2026-11-24 - PC 3 v7: instalacion completa de Node sin bloqueo MSI 1603
+
+- `scripts/node_pc3.ps1` instala la distribucion oficial Node24.22.3 x64,
+  con npm y npx completos, si no existe una instalacion Node24 funcional.
+  Verifica el SHA256 oficial antes de extraer; conserva instalaciones existentes.
+  Un runtime local incompleto se renombra como respaldo antes de reinstalar.
+- `scripts/instalar_pc3.ps1` utiliza ese modulo, persiste PATH del usuario y
+  restaura la prioridad del Node local despues de cada Refresh-Path.
+  Continuan npm ci, globales, Build Tools si hacen falta, pip y todos los servicios.
+- El empaquetador incluye el ZIP oficial Node como unica excepcion de archivo
+  ZIP de runtime; comprueba su hash y conserva todo el ecosistema de v6.
+- Version v7 en instalador/manifiesto/inventario y LEEME_PC3_v7.md nuevo.
+  `.gitignore` excluye el runtime expandido para evitar subir binarios.
+- `scripts/test_node_pc3.ps1`: prueba real aislada de extraccion, node/npm/npx,
+  reutilizacion, prioridad tras Refresh-Path y rechazo SHA256. El empaquetador
+  exige esta prueba sobre su contenido final sin alterar PATH de PC1.
+- Pruebas existentes y verificacion del paquete. El log de MSI de PC3 no es accesible desde PC1:
+  no se atribuye causa especifica a 1603 ni se anuncia instalacion remota exitosa.
+- Cascada AG fallo con HTTP502; no se reintento la inferencia.
+- Sin cambios en bridge_server.py, consultar_gemini.py ni bucle_autonomo.py.
+
 ## 2026-11-24 - Instalador PC 3 v6: argumentos nativos corregidos
 
 - `scripts/instalar_pc3.ps1`: se elimina ValueFromRemainingArguments de Run y

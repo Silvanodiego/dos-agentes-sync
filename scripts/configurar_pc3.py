@@ -1,4 +1,4 @@
-"""Configuracion inicial v6. No importa tokens ni bases de datos de otra PC."""
+"""Configuracion inicial v7. No importa tokens ni bases de datos de otra PC."""
 from __future__ import annotations
 
 import argparse

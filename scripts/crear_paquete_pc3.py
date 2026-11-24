@@ -1,4 +1,4 @@
-"""Construye v6 desde las fuentes Git, con exclusion estricta e integridad."""
+"""Construye v7 desde las fuentes Git, con exclusion estricta e integridad."""
 import argparse
 import ast
 import fnmatch
@@ -13,7 +13,7 @@ import tomllib
 import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
-NAME = 'Migracion_Codex_Limpia_v6'
+NAME = 'Migracion_Codex_Limpia_v7'
 PROTECTED = ('bridge_server.py', 'consultar_gemini.py', 'bucle_autonomo.py')
 
 
@@ -31,6 +31,8 @@ def allowed(relative):
                       'credentials', 'credenciales', '.plugin-appserver'}
     if forbidden_dirs.intersection(parts):
         return False
+    if path.as_posix().lower() == 'runtime/installers/node-v24.22.3-win-x64.zip':
+        return True  # Distribucion oficial verificada, necesaria para instalar npm/npx.
     name = parts[-1]
     # Exportaciones Codex solicitadas para migrar; nunca se agregan a Git.
     if len(parts) == 1 and name in ('auth_c1.json', 'auth_c2.json'):
@@ -51,7 +53,7 @@ def build(desktop: Path, drive: Path):
         sources.append(name)
     if any(not (ROOT / p).is_file() for p in sources):
         raise RuntimeError('Hay fuentes Git faltantes.')
-    with tempfile.TemporaryDirectory(prefix='codex-v6-package-') as tmp:
+    with tempfile.TemporaryDirectory(prefix='codex-v7-package-') as tmp:
         stage = Path(tmp) / NAME
         stage.mkdir()
         for relative in sources:
@@ -64,7 +66,8 @@ def build(desktop: Path, drive: Path):
         print('Recuperando ecosistema completo y verificando bundles...', flush=True)
         assemble(stage, ROOT, allowed)
         required = ('instalar.bat', 'scripts/instalar_pc3.ps1', 'scripts/configurar_pc3.py',
-                    'scripts/esquemas_pc3.py', 'arrancar_todo_oculto.vbs',
+                    'scripts/esquemas_pc3.py', 'scripts/node_pc3.ps1',
+                    'runtime/installers/node-v24.22.3-win-x64.zip', 'arrancar_todo_oculto.vbs',
                     'chat_fijo_gemini.py', 'piloto_gemini.py', 'abrir_chrome_gemini.bat',
                     'abrir_chrome_gemini_oculto.bat', 'AGENTS.md', 'agy.bat',
                     'antigravity_mcp.mjs', 'panel_web_ag/server.py', 'monitor_cuota.pyw')
@@ -77,7 +80,7 @@ def build(desktop: Path, drive: Path):
                 ast.parse((stage / relative).read_text(encoding='utf-8-sig'), filename=relative)
         rows = [{'path': p.relative_to(stage).as_posix(), 'sha256': sha(p), 'bytes': p.stat().st_size}
                 for p in sorted(stage.rglob('*')) if p.is_file()]
-        manifest = {'version': 'v6', 'git_commit': subprocess.check_output(
+        manifest = {'version': 'v7', 'git_commit': subprocess.check_output(
             ['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
             'protected_sha256': protected, 'files': rows}
         (stage / 'MANIFIESTO_SHA256.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
@@ -87,6 +90,10 @@ def build(desktop: Path, drive: Path):
             raise RuntimeError('Fallo instalar.bat -Verificar.')
         subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
                         '-File', str(stage / 'scripts/test_argumentos_instalador_pc3.ps1')],
+                       cwd=stage, check=True)
+        subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                        '-File', str(stage / 'scripts/test_node_pc3.ps1'),
+                        '-Archive', str(stage / 'runtime/installers/node-v24.22.3-win-x64.zip')],
                        cwd=stage, check=True)
         zip_path = Path(tmp) / (NAME + '.zip')
         with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9,

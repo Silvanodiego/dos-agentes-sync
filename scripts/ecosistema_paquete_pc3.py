@@ -127,6 +127,12 @@ def assemble(stage, root, allowed):
     destination = stage / 'runtime/installers' / MANAGER_NAME
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(manager, destination)
+    node_name = 'node-v24.22.3-win-x64.zip'
+    node = Path(os.environ['TEMP']) / node_name
+    node_sha = 'e612af99f626ab415ea225af6bce5c971feb448cb5cae250bb1c3fa50c5f7d9f'
+    if not node.is_file() or hashlib.sha256(node.read_bytes()).hexdigest() != node_sha:
+        raise RuntimeError('Falta ZIP oficial Node24 verificado en TEMP: ' + node_name)
+    shutil.copy2(node, stage / 'runtime/installers' / node_name)
     settings = Path.home() / '.antigravity-agent/gui_config.json'
     safe = {}
     if settings.is_file():
@@ -147,13 +153,13 @@ def assemble(stage, root, allowed):
         files = [p for p in (stage / group).rglob('*') if p.is_file()]
         inventory.append({'component': group, 'files': len(files), 'bytes': sum(p.stat().st_size for p in files)})
     (stage / 'INVENTARIO_ECOSISTEMA.json').write_text(json.dumps({
-        'version': 'v6', 'components': inventory, 'recovered_from_v4': len(recovered),
+        'version': 'v7', 'components': inventory, 'recovered_from_v4': len(recovered),
         'manager': {'version': '0.30.0', 'sha256': MANAGER_SHA},
         'exclusions': 'DB, logs, caches, node_modules, venv, auth.json, perfiles Chrome y credenciales Antigravity',
         'external_projects': 'No se migran proyectos externos Unity/Patitas/MISC ni sus MCP especificos.'
     }, indent=2), encoding='utf-8')
     (stage / 'LEEME_ECOSISTEMA.txt').write_text(
-        'V6 COMPLETA: fuentes actuales + ecosistema recuperado de v4.\n'
+        'V7 COMPLETA: fuentes actuales + ecosistema recuperado de v4.\n'
         'Inventario exacto y hashes: MANIFIESTO_SHA256.json; resumen: INVENTARIO_ECOSISTEMA.json.\n'
         'Manager 0.30.0 incluye sus dependencias en el instalador oficial NSIS.\n'
         'No incluye entornos ni node_modules sueltos: el instalador los reconstruye con pip/npm.\n'

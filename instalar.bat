@@ -1,7 +1,7 @@
 @echo off
 setlocal
-title Migracion Codex Limpia v6 - PC 3
-echo Migracion Codex Limpia v6 - instalacion con progreso visible
+title Migracion Codex Limpia v7 - PC 3
+echo Migracion Codex Limpia v7 - instalacion con progreso visible
 rem Evita heredar modulos PowerShell 7 incompatibles al abrir Windows PowerShell 5.1.
 set "PSModulePath=%SystemRoot%\System32\WindowsPowerShell\v1.0\Modules;%ProgramFiles%\WindowsPowerShell\Modules"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\instalar_pc3.ps1" %*

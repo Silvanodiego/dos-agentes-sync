@@ -4,10 +4,13 @@ $ProgressPreference = 'Continue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $source = Split-Path $PSScriptRoot -Parent
 $repo = 'https://github.com/Silvanodiego/dos-agentes-sync.git'
+. (Join-Path $PSScriptRoot 'node_pc3.ps1')
 function Paso($n, $text) { Write-Host "`n[$n/6] $text" -ForegroundColor Cyan }
 function Refresh-Path {
     $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User') + ";$env:ProgramFiles\nodejs;$env:ProgramFiles\Git\cmd;$env:LOCALAPPDATA\Microsoft\WindowsApps"
     Get-ChildItem "$env:LOCALAPPDATA\Programs\Python" -Directory -ErrorAction SilentlyContinue | ForEach-Object { $env:Path = $_.FullName + ';' + (Join-Path $_.FullName 'Scripts') + ';' + $env:Path }
+    $localNode = Join-Path $Destino 'runtime\node-v24.22.3-win-x64'
+    if (Test-Path -LiteralPath (Join-Path $localNode 'node.exe')) { Enable-NodePath -Directory $localNode }
 }
 function Run {
     param([Parameter(Mandatory=$true)][string]$exe, [string[]]$Arguments)
@@ -37,7 +40,7 @@ function Check-Package {
     foreach ($group in @('codex\skills','codex\plugins','codex\marketplaces','repos_referencia\token-saver','ScriptsGlobales\modulos_enjambre','runtime\agy','runtime\installers','git_bundles')) {
         if (!(Test-Path -LiteralPath (Join-Path $source $group) -PathType Container)) { throw "Falta grupo del ecosistema: $group" }
     }
-    Write-Host "Integridad correcta: $($manifest.files.Count) archivos, paquete v6."
+    Write-Host "Integridad correcta: $($manifest.files.Count) archivos, paquete v7."
 }
 try {
     Paso 1 'Verificando integridad...'
@@ -100,14 +103,7 @@ try {
         Run -exe $py -Arguments @('-m','pip','install','-r','repos_referencia\Agentic-SEO-Skill\requirements.txt')
     }
     Paso 4 'Instalando Node.js y paquetes npm (salida en vivo)...'
-    $nodeOk = $false
-    if (Get-Command node.exe -ErrorAction SilentlyContinue) {
-        $nodeVersion = (& node.exe --version)
-        $nodeOk = $LASTEXITCODE -eq 0 -and $nodeVersion -match '^v24\.'
-    }
-    if (!$nodeOk) { Winget 'OpenJS.NodeJS.24' }
-    $nodeVersion = & node.exe --version
-    if ($nodeVersion -notmatch '^v24\.') { throw 'Se requiere Node.js LTS 24, compatible con la PC 1. winget no proporciono esa version.' }
+    Install-Node24 -Root $Destino -Persist
     function Npm-Install {
         param([string[]]$NpmArguments)
         & npm.cmd @NpmArguments
@@ -199,7 +195,7 @@ try {
     # Inicio local inmediato; la sincronizacion Git queda en la tarea periodica.
     Run -exe $py -Arguments @('scripts\configurar_pc3.py','--root',$Destino,'--home',$env:USERPROFILE,'--iniciar')
     Start-Process -FilePath "$env:WINDIR\System32\cmd.exe" -ArgumentList ('/d /s /c ""' + (Join-Path $Destino 'abrir_chrome_gemini_oculto.bat') + '""') -WorkingDirectory $Destino -WindowStyle Hidden | Out-Null
-    Write-Host 'INSTALACION COMPLETA - v6' -ForegroundColor Green
+    Write-Host 'INSTALACION COMPLETA - v7' -ForegroundColor Green
     Write-Host 'Debe volver a autenticar las cuentas en Antigravity Manager y Gemini: no se migraron credenciales ni perfiles DPAPI.' -ForegroundColor Yellow
     Write-Host 'Codex usa la exportacion auth_c1.json si no existia auth.json. Si expiro su sesion, vuelva a iniciar sesion. Gemini: abrir_chrome_gemini.bat.'
     exit 0
