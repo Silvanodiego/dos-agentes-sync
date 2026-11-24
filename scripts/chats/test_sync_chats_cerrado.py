@@ -137,6 +137,23 @@ class CrashpadTests(unittest.TestCase):
         rows = [self.record(1, 2), self.record(2, 1)]
         self.assertEqual(eligible(rows, r'C:\Program Files'), [])
 
+    def node(self):
+        return dict(self.record(7, 99, kind='utility'), subtype='node.mojom.NodeService')
+
+    def test_orphan_node_selected_only_without_active_codex(self):
+        self.assertEqual([p['pid'] for p in eligible([self.node()], r'C:\Program Files')], [7])
+        self.assertEqual(eligible([self.node(), self.record(8, 99, kind='')], r'C:\Program Files'), [])
+
+    def test_node_with_child_or_unknown_type_preserved(self):
+        self.assertEqual(eligible([self.node(), self.record(8, 7, kind='')], r'C:\Program Files'), [])
+        node = self.node()
+        node['subtype'] = 'unknown'
+        self.assertEqual(eligible([node], r'C:\Program Files'), [])
+
+    def test_unknown_codex_executable_blocks_node_cleanup(self):
+        other = dict(self.record(8, 99, kind=''), name='codex.exe', path=None)
+        self.assertEqual(eligible([self.node(), other], r'C:\Program Files'), [])
+
     def test_first_observation_and_grace_never_terminate(self):
         rows = [self.record(1, 99)]
         with tempfile.TemporaryDirectory() as directory, \

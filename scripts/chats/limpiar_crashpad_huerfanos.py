@@ -1,4 +1,4 @@
-"""Retira solo reportadores Crashpad huerfanos persistentes de Codex MSIX."""
+"""Retira auxiliares huerfanos persistentes y verificados de Codex MSIX."""
 import ctypes
 from ctypes import wintypes
 import json
@@ -46,6 +46,21 @@ def eligible(snapshot, program_files):
             if not handler(parent) or parent['born'] > cursor['born']:
                 break
             cursor = parent
+    # NodeService can survive Quit without its app-server child. Never retire
+    # it while any other Codex component is active or its identity is unknown.
+    nodes = [p for p in snapshot if
+             p.get('kind') == 'utility' and p.get('subtype') == 'node.mojom.NodeService'
+             and isinstance(p.get('born'), int)
+             and bool(pattern.fullmatch((p.get('path') or '').replace('\\', '/')))
+             and p['parent'] not in records
+             and not any(c['parent'] == p['pid'] for c in snapshot)]
+    disposable = {p['pid'] for p in result + nodes}
+    codex_prefix = (prefix + '/OpenAI.Codex_').casefold()
+    relevant = [p for p in snapshot if
+                (p.get('path') or '').replace('\\', '/').casefold().startswith(codex_prefix)
+                or (p.get('name') or '').casefold() == 'codex.exe']
+    if relevant and all(p['pid'] in disposable for p in relevant):
+        result.extend(nodes)
     return result
 
 
@@ -54,10 +69,12 @@ def snapshot():
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 $rows = @(Get-CimInstance Win32_Process | ForEach-Object {
-    $kind = ''
+    $kind = ''; $subtype = ''
     if ($_.Name -eq 'ChatGPT.exe' -and $_.CommandLine -match '(?:^|\s)--type=([^\s"]+)') { $kind = $Matches[1] }
+    if ($_.Name -eq 'ChatGPT.exe' -and $_.CommandLine -match '(?:^|\s)--utility-sub-type=([^\s"]+)') { $subtype = $Matches[1] }
     [pscustomobject]@{pid=[int]$_.ProcessId; parent=[int]$_.ParentProcessId;
-        path=$_.ExecutablePath; kind=$kind; born=if ($_.CreationDate) {$_.CreationDate.ToFileTimeUtc()} else {$null}}
+        name=$_.Name; path=$_.ExecutablePath; kind=$kind; subtype=$subtype;
+        born=if ($_.CreationDate) {$_.CreationDate.ToFileTimeUtc()} else {$null}}
 })
 ConvertTo-Json -InputObject $rows -Compress
 '''
