@@ -1,8 +1,8 @@
 param([Parameter(Mandatory=$true)][string]$Archive)
 $ErrorActionPreference = 'Stop'
 # Cargar cmdlets antes de simular PATH sin Node ni rutas de PowerShell.
-Import-Module Microsoft.PowerShell.Utility -ErrorAction Stop
-Import-Module Microsoft.PowerShell.Archive -ErrorAction Stop
+Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Utility\Microsoft.PowerShell.Utility.psd1') -Force -ErrorAction Stop
+Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Archive\Microsoft.PowerShell.Archive.psd1') -Force -ErrorAction Stop
 . (Join-Path $PSScriptRoot 'node_pc3.ps1')
 $repository = Split-Path $PSScriptRoot -Parent
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('node pc3 test ' + [guid]::NewGuid())

@@ -1,6 +1,6 @@
 # Node oficial con npm y npx completos; alternativa al MSI que falla con 1603.
-Import-Module Microsoft.PowerShell.Utility -ErrorAction Stop
-Import-Module Microsoft.PowerShell.Archive -ErrorAction Stop
+Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Utility\Microsoft.PowerShell.Utility.psd1') -Force -ErrorAction Stop
+Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Archive\Microsoft.PowerShell.Archive.psd1') -Force -ErrorAction Stop
 function Enable-NodePath {
     param([string]$Directory, [switch]$Persist)
     $env:Path = $Directory + ';' + (($env:Path -split ';' | Where-Object { $_ -and $_.TrimEnd('\') -ine $Directory.TrimEnd('\') }) -join ';')
