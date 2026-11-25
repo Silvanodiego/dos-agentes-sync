@@ -1,9 +1,11 @@
 # Estado del proyecto
 Fecha: 2026-11-25 (America/Buenos_Aires).
-Hecho: creado scripts/verificar_flujo_10m.ps1; verificacion pasiva local sin prompts.
-Hecho: tarea DosAgentes_Verificador_10m habilitada para HP\H_P cada 10 minutos, PowerShell oculto.
-Verificado: sintaxis PowerShell; timeout 4 s por chequeo; log UTF-8 sin BOM, maximo 200 lineas.
-Prueba real: TCP 8765 y 8045 responden. CDP 9222 responde, pero no tiene pestaña Gemini; salida 1.
-Protegidos: bridge_server.py, piloto_gemini.py, chat_fijo_gemini.py y AGENTS.md intactos.
-Proximo paso exacto: abrir abrir_chrome_gemini.bat para disponer de una pestaña Gemini y repetir el verificador.
-Alternativa: abrir https://gemini.google.com/app en el navegador ya conectado a CDP 9222.
+Hecho: respaldo original en config_backups/bridge_server_bak_20261125.py.
+Hecho: bridge_server.py rota hasta 4 cuentas activas ante 429, timeout y 5xx; conserva API.
+Limites: 25 s por intento; presupuesto 110 s revisado entre intentos; errores sin secretos en logs.
+Hecho: verificador recupera servicios una vez sin duplicar procesos; abre Gemini via CDP si falta.
+Verificado: py_compile y 5 pruebas con mocks aprobadas, incluida rotacion de cuenta 1 a 2 por 429.
+Verificado: 8765 reiniciado y ready; verificador 2026-11-25 20:18:45 -03:00 OK, salida 0.
+Protegidos: AGENTS.md, piloto_gemini.py y chat_fijo_gemini.py intactos.
+Bloqueos: ninguno en las pruebas; no se verifico inferencia real para evitar consumir cuota.
+Proximo paso exacto: revisar logs/bridge_8765.log tras la proxima consulta autorizada para confirmar rotacion upstream si ocurre cuota agotada.

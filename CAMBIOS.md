@@ -457,3 +457,14 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - Log UTF-8 sin BOM limitado a 200 lineas; aviso discreto cuando hay UI y salida 1 ante fallo, 0 ante exito. Fuente ASCII compatible con Windows PowerShell 5.1 sin BOM.
 - Tarea DosAgentes_Verificador_10m registrada con schtasks cada 10 minutos para el usuario actual y PowerShell oculto.
 - Prueba real: TCP 8765/8045 responden; CDP responde pero sin pestaña Gemini, salida 1 esperada. Los cuatro archivos protegidos conservan contenido y LastWriteTime.
+
+### 2026-11-25 - Rotacion de cuentas y auto-recuperacion
+- Respaldo previo config_backups/bridge_server_bak_20261125.py: SHA256 igual al bridge_server.py original (733DC540CAB744FF1D33A78F9A9A8E914272BA3AA61601D290205E11036F1A5E).
+- bridge_server.py: selecciona hasta 4 cuentas activas, prioriza is_active y rota ante 429, 5xx o timeout. Mantiene rutas, autenticacion y campos de respuesta HTTP/MCP. Timeout por intento 25 s y presupuesto de solicitud 110 s entre intentos.
+- Rotaciones registradas en logs/bridge_8765.log con posicion de cuenta, motivo y siguiente posicion; sin emails, secretos ni contenido de modelos.
+- scripts/verificar_flujo_10m.ps1: un intento de recuperacion por servicio; inspeccion de procesos antes de iniciar Manager, bridge o Chrome. Si existe un proceso que no responde, no lo duplica ni lo mata. CDP vivo sin Gemini abre la pestana mediante PUT /json/new, sin prompts.
+- Re-verificacion hasta 10 s, salidas OK/RECUPERADO/FALLO_PERSISTENTE, log limitado a 200 lineas y aviso discreto en fallos persistentes.
+- scripts/test_bridge_rotation.py: 5 pruebas aisladas aprobadas (429 a cuenta 2, 503, timeout, agotamiento de 4 cuentas y presupuesto vencido). py_compile aprobado.
+- Reiniciado exclusivamente el proceso Python identificado en 8765; GET ready verificado. Verificador real: 2026-11-25 20:18:45 -03:00 OK, salida 0. No se enviaron consultas a modelos.
+- AGENTS.md, piloto_gemini.py y chat_fijo_gemini.py sin cambios.
+- .gitignore: excepcion limitada al respaldo bridge_server_bak_20261125.py; los demas respaldos siguen excluidos. No se uso git add -f.

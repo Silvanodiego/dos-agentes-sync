@@ -1,4 +1,6 @@
-import json, pathlib, subprocess, sys, hmac, time, sqlite3, urllib.request
+import json, pathlib, subprocess, sys, hmac, time, sqlite3, urllib.request, urllib.error, socket
+from datetime import datetime
+from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 CFG = pathlib.Path.home() / ".antigravity-agent"
 CLOUD_DB = CFG / "cloud_accounts.db"
@@ -8,14 +10,68 @@ MODELS = ["gemini-4-argon-high", "claude-sonnet-5-5-high", "claude-opus-5-5-high
 def get_token():
     return TOKEN_FILE.read_text(encoding="utf-8").strip() if TOKEN_FILE.exists() else ""
 
+REQUEST_BUDGET = 110
+ATTEMPT_TIMEOUT = 25
+
+def active_accounts():
+    # Solo metadatos: no se leen token_json ni otros secretos de cuentas.
+    with closing(sqlite3.connect(CLOUD_DB.as_uri() + "?mode=ro", uri=True, timeout=2)) as con:
+        rows = con.execute("SELECT id, email FROM accounts WHERE status='active' "
+                           "ORDER BY COALESCE(is_active, 0) DESC, COALESCE(last_used, 0) DESC LIMIT 4").fetchall()
+    return rows or [(None, "default")]
+
 def pick_account():
-    try:
-        con = sqlite3.connect(str(CLOUD_DB))
-        rows = con.execute("SELECT id, email FROM accounts WHERE status='active' ORDER BY COALESCE(last_used, 0) DESC").fetchall()
-        con.close()
-        return rows[0] if rows else (None, "default")
-    except Exception:
-        return (None, "default")
+    return active_accounts()[0]
+
+def rotation_log(account, reason, next_account=None):
+    # Numeros de posicion; nunca emails, prompts, cabeceras ni cuerpos de error.
+    path = pathlib.Path(__file__).resolve().parent / "logs" / "bridge_8765.log"
+    path.parent.mkdir(exist_ok=True)
+    line = (f"{datetime.now().astimezone().isoformat(timespec='seconds')} "
+            f"account={account} reason={reason} next_account={next_account or 'none'}\n")
+    with path.open("a", encoding="utf-8") as log:
+        log.write(line)
+
+def ask_accounts(config, prompt):
+    accounts = active_accounts()
+    deadline = time.monotonic() + REQUEST_BUDGET
+    url = "http://%s:%s/v1/chat/completions" % (config.get("host", "127.0.0.1"), config.get("port", 8045))
+    last_error = "no_response"
+    for index, (account_id, account_email) in enumerate(accounts, 1):
+        reason = "models_exhausted"
+        for model in MODELS:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                rotation_log(index, "request_deadline")
+                return 502, {"status": "error", "error": "all_models_failed", "detail": "request_deadline"}
+            payload = json.dumps({"model": model, "messages": [{"role": "user", "content": str(prompt)}]}).encode("utf-8")
+            headers = {"Content-Type": "application/json", "X-Antigravity-Account-Id": str(account_id or "")}
+            if config.get("api_key"):
+                headers["Authorization"] = "Bearer " + config["api_key"]
+            request = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(request, timeout=min(ATTEMPT_TIMEOUT, remaining)) as response:
+                    answer = json.loads(response.read().decode("utf-8", errors="replace"))["choices"][0]["message"]["content"].strip()
+                if answer:
+                    return 200, {"status": "ok", "model": model, "account": account_email, "response": answer}
+                reason = "empty_response"
+            except urllib.error.HTTPError as exc:
+                reason = f"http_{exc.code}"
+                exc.close()
+                if exc.code == 429 or 500 <= exc.code <= 599:
+                    break  # La siguiente cuenta prueba primero el modelo prioritario.
+            except (TimeoutError, socket.timeout):
+                reason = "timeout"
+                break
+            except urllib.error.URLError as exc:
+                reason = "timeout" if isinstance(exc.reason, (TimeoutError, socket.timeout)) else "connection_error"
+                break
+            except (ValueError, KeyError, IndexError, TypeError):
+                reason = "invalid_response"
+            last_error = reason
+        last_error = reason
+        rotation_log(index, reason, index + 1 if index < len(accounts) else None)
+    return 502, {"status": "error", "error": "all_models_failed", "detail": last_error}
 
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
@@ -45,23 +101,8 @@ class H(BaseHTTPRequestHandler):
                 self.send(200, {"status": "ok" if p.returncode == 0 else "error", "exit_code": p.returncode, "stdout": p.stdout[-65536:], "stderr": p.stderr[-65536:]})
             elif self.path == "/ask":
                 c = json.loads((CFG / "gui_config.json").read_text(encoding="utf-8")).get("proxy", {})
-                acct_id, acct_email = pick_account()
-                url = "http://%s:%s/v1/chat/completions" % (c.get("host", "127.0.0.1"), c.get("port", 8045))
-                last_err = "ningun modelo respondio"
-                for m in MODELS:
-                    try:
-                        payload = json.dumps({"model": m, "messages": [{"role": "user", "content": str(data["prompt"])}]}).encode("utf-8")
-                        headers = {"Content-Type": "application/json", "X-Antigravity-Account-Id": str(acct_id or "")}
-                        if c.get("api_key"): headers["Authorization"] = "Bearer " + c["api_key"]
-                        req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
-                        with urllib.request.urlopen(req, timeout=60 if m.startswith("gemini") else 22) as r:
-                            ans = json.loads(r.read().decode("utf-8", errors="replace"))["choices"][0]["message"]["content"].strip()
-                        if ans:
-                            self.send(200, {"status": "ok", "model": m, "account": acct_email, "response": ans})
-                            return
-                    except Exception as ex:
-                        last_err = f"{m}: {ex}"
-                self.send(502, {"status": "error", "error": "all_models_failed", "detail": last_err[:400]})
+                code, result = ask_accounts(c, data["prompt"])
+                self.send(code, result)
             else:
                 self.send(404, {"status": "error", "error": "not_found"})
         except subprocess.TimeoutExpired:
