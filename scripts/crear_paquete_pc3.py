@@ -44,6 +44,10 @@ def allowed(relative):
 
 
 def build(desktop: Path, drive: Path):
+    # Los tests Windows PowerShell 5.1 no deben heredar modulos de pwsh 7.
+    os.environ['PSModulePath'] = os.pathsep.join((
+        str(Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/Modules'),
+        str(Path(os.environ['ProgramFiles']) / 'WindowsPowerShell/Modules')))
     protected = {name: sha(ROOT / name) for name in PROTECTED}
     paths = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode('utf-8').split('\0')
     sources = sorted(set(p for p in paths if p and allowed(p)))
