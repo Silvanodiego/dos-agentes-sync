@@ -451,3 +451,9 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 ### 2026-11-25 - Continuidad automática por proyecto
 - AGENTS.md y config_compartida/AGENTS.md: agregada al final la sección solicitada de ESTADO.md, conservando todos los bytes originales y UTF-8 sin BOM.
 - ESTADO.md: registro de continuidad de esta tarea; bridge_server.py sin modificaciones.
+
+### 2026-11-25 - Verificador pasivo cada 10 minutos
+- scripts/verificar_flujo_10m.ps1: TCP local 8765/8045 y GET CDP 9222/json/list con timeout de 4 segundos; exige al menos una pestaña Gemini. No envia prompts ni inicia/reinicia servicios.
+- Log UTF-8 sin BOM limitado a 200 lineas; aviso discreto cuando hay UI y salida 1 ante fallo, 0 ante exito. Fuente ASCII compatible con Windows PowerShell 5.1 sin BOM.
+- Tarea DosAgentes_Verificador_10m registrada con schtasks cada 10 minutos para el usuario actual y PowerShell oculto.
+- Prueba real: TCP 8765/8045 responden; CDP responde pero sin pestaña Gemini, salida 1 esperada. Los cuatro archivos protegidos conservan contenido y LastWriteTime.
