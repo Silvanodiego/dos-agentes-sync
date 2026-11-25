@@ -12,10 +12,18 @@ ROOT = Path(__file__).resolve().parents[1]
 loader = importlib.machinery.SourceFileLoader('quota_monitor', str(ROOT / 'monitor_cuota.pyw'))
 spec = importlib.util.spec_from_loader(loader.name, loader)
 monitor = importlib.util.module_from_spec(spec)
-loader.exec_module(monitor)
+with patch('logging.basicConfig'):
+    loader.exec_module(monitor)
 
 
 class RotationTests(unittest.TestCase):
+    def setUp(self):
+        # No crear logs en fuentes ni contaminar el registro del monitor real.
+        for name in ('info', 'warning', 'exception', 'error'):
+            guard = patch.object(monitor.logging, name)
+            guard.start()
+            self.addCleanup(guard.stop)
+
     def test_sqlite_wal_activity_prevents_false_idle(self):
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
