@@ -468,3 +468,14 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - Reiniciado exclusivamente el proceso Python identificado en 8765; GET ready verificado. Verificador real: 2026-11-25 20:18:45 -03:00 OK, salida 0. No se enviaron consultas a modelos.
 - AGENTS.md, piloto_gemini.py y chat_fijo_gemini.py sin cambios.
 - .gitignore: excepcion limitada al respaldo bridge_server_bak_20261125.py; los demas respaldos siguen excluidos. No se uso git add -f.
+
+### 2026-11-25 - Piloto con inactividad, reintento y verificador portable
+- Respaldo previo exacto: config_backups/piloto_gemini_bak_20261125.py, SHA256 EB18C86BC8ED1E0EBF97B83890BEDA5195B9202D25DBB89A3479694B945D2243.
+- piloto_gemini.py: vigila cambios de tamano/mtime en salida y respuesta final de Codex cada segundo; corta el arbol tras 300 s sin actividad, con tope total de 900 s por intento (o el timeout CLI menor).
+- Un reintento por paso ante timeout, conexion, rate-limit o respuesta vacia; antes ejecuta una vez el verificador (limite 90 s) y espera 10 s. No reintenta credenciales/autenticacion ni respuestas exitosas, incluida [ENTREGA_FINAL].
+- Eventos controlados de inactividad, recuperacion y reintento en .sync-local/chat-fijo/<ejecucion>/piloto.log, sin prompts ni credenciales. Cada intento Codex conserva su propio archivo/log.
+- Si Gemini ya intento enviar, el reintento recupera la respuesta del mismo chat, sin duplicar el mensaje. Si no puede recuperar conexion/respuesta, devuelve error tras el segundo intento.
+- scripts/instalar_verificador_10m.ps1: registra/actualiza la tarea para el usuario actual cada 10 minutos, PowerShell oculto; ejecuta el verificador y muestra su ultima linea, conservando su codigo de error.
+- scripts/test_piloto_resiliencia.py: 10 pruebas con mocks aprobadas (inactividad, actividad, tope total, reintento exitoso/limitado, vacio, cierre final, credenciales y recuperacion Gemini sin doble envio). py_compile y parser PowerShell aprobados; argumentos CLI/defaults identicos al respaldo.
+- Instalador ejecutado dos veces sin errores: tarea Listo, intervalo PT10M; ultima corrida 2026-11-25 20:31:45 -03:00 OK. Sin consultas reales a modelos.
+- .gitignore: excepcion limitada al respaldo autorizado del piloto para versionarlo sin git add -f. AGENTS.md, bridge_server.py y chat_fijo_gemini.py conservan sus hashes.

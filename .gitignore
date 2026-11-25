@@ -80,3 +80,6 @@ chrome_gemini_profile/
 !/config_backups/
 /config_backups/*
 !/config_backups/bridge_server_bak_20261125.py
+
+# Respaldo del piloto autorizado el 2026-11-25.
+!/config_backups/piloto_gemini_bak_20261125.py
