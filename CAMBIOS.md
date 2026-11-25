@@ -404,3 +404,10 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - Paquete incluye sincronizador de chats actuales y proyectos futuros, continuidad y rutas portables. Conserva limites documentados de barra lateral y prueba fisica entre PCs aun pendiente; no garantiza fusion de ramas simultaneas ni historial SQLite original reanudable cuando no hay rollout.
 - scripts/test_v8_reinstalacion.py: verifica versiones npm, estado pending, activacion y timeout sin tareas o login reales.
 - scripts/verificar_token_saver.py: evita reconstruir token-saver si la version instalada coincide, sin importar/ejecutar su fuente. Pruebas adicionales: 5 casos de reinstalacion/activador, 4 de GitHub, 39 del sincronizador y sintaxis PowerShell 5.1 aprobados.
+
+### 2026-11-24 - V8: detener bucle de rotacion de cuenta Codex
+- monitor_cuota.pyw: logs confirmaron intentos automaticos C1 -> C2 repetidos tras fallar el cierre de procesos (21:26 y 21:29). No se confirmo una rotacion exitosa: el monitor informaba C1 restaurada. Causa especifica del cierre pendiente; no se fuerza otro cierre para investigarla con trabajo activo.
+- Parche puntual: ante fallo, bloqueo persistente de rotacion automatica en .sync-local/rotacion_cuota.json; reanudacion explicita desde bandeja. Un cierre fallido no escribe auth.json ni lanza otra instancia de Codex. El estado corrupto tambien bloquea por seguridad.
+- Deteccion de actividad incluye state/thread_history SQLite y WAL, ademas de rollouts. Se desactiva limpieza antigua que borraba historiales: el monitor conserva todos los chats.
+- PC1: detenido solo el monitor de cuota y creado bloqueo preventivo; se reinicia el monitor actualizado para mostrar cuotas sin rotar. No se cierran Codex ni servicios, ni se cambian credenciales.
+- scripts/test_rotacion_cuota.py: cinco pruebas sin procesos ni credenciales reales; fallo de cierre sin escritura/reinicio, bloqueo persistente y reanudacion, SQLite activo y preservacion de historiales. scripts/crear_paquete_pc3.py ejecuta tambien estas pruebas antes de comprimir V8. Tres scripts protegidos conservan sus hashes originales.

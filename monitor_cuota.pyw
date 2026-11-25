@@ -19,6 +19,7 @@ IDLE_SECONDS = 15
 QUOTA_INTERVAL = 30
 MAX_QUOTA_AGE = 90
 AUTH_LOCK = threading.RLock()
+ROTATION_STATE = BASE / '.sync-local' / 'rotacion_cuota.json'
 logging.basicConfig(filename=BASE / 'monitor_cuota.log', level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s')
 
@@ -53,18 +54,39 @@ def session_files(directory):
 def latest_write():
     # Desktop always writes in .codex, including after switching to account 2.
     files = session_files(SESSIONS[1])
-    return files[0][0] if files else None
+    writes = [files[0][0]] if files else []
+    # Codex actual tambien persiste chats en SQLite/WAL, sin tocar el rollout.
+    for pattern in ('state_*.sqlite', 'state_*.sqlite-wal',
+                    'thread_history_*.sqlite', 'thread_history_*.sqlite-wal'):
+        for path in SESSIONS[1].parent.glob(pattern):
+            try:
+                writes.append(path.stat().st_mtime)
+            except OSError:
+                pass
+    return max(writes) if writes else None
 
 
 def cleanup_old_chats():
-    for directory in SESSIONS.values():
-        for mtime, path in session_files(directory)[KEEP_CHATS:]:
-            # Keep recent files as well, to protect other chats still in progress.
-            if time.time() - mtime > 86400:
-                try:
-                    path.unlink()
-                except OSError:
-                    pass
+    # Los historiales existentes tambien se sincronizan: nunca eliminarlos aqui.
+    return
+
+
+def rotation_blocked():
+    try:
+        return bool(json.loads(ROTATION_STATE.read_text(encoding='utf-8-sig'))['blocked'])
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError, KeyError):
+        # Un estado ilegible nunca habilita cierres automaticos de Codex.
+        return True
+
+
+def block_rotation(reason):
+    ROTATION_STATE.parent.mkdir(parents=True, exist_ok=True)
+    temporary = ROTATION_STATE.with_suffix('.tmp')
+    temporary.write_text(json.dumps({'blocked': True, 'reason': reason,
+                                     'time': time.time()}), encoding='utf-8')
+    os.replace(temporary, ROTATION_STATE)
 
 
 def fetch_quota(number):
@@ -161,9 +183,12 @@ if ($remaining.Count) { throw 'Quedaron procesos de Codex abiertos' }
                                 creationflags=subprocess.CREATE_NO_WINDOW)
         logging.info('ROTACION cierre procesos resultado=%s duracion=%.2fs', result.returncode,
                      time.monotonic() - started)
+        if result.returncode:
+            # El cierre fallo antes de tocar auth.json. No copiar ni relanzar.
+            # Registrar solo el codigo; stderr podria contener datos del entorno.
+            raise RuntimeError('No se pudieron cerrar todos los procesos de Codex; '
+                               'rotacion automatica pausada')
         try:
-            if result.returncode:
-                raise RuntimeError('No se pudieron cerrar todos los procesos de Codex')
             if active_account() != expected:
                 raise RuntimeError('La cuenta activa cambio durante el cierre')
             atomic_copy(LIVE_AUTH, AUTHS[expected])
@@ -277,6 +302,7 @@ class Monitor:
             'monitor_cuota', tray_image(None), 'Cuota Codex: leyendo ambas cuentas...',
             menu=pystray.Menu(
                 pystray.MenuItem('Cambiar cuenta ahora', self.request_switch),
+                pystray.MenuItem('Reanudar cambios automaticos', self.resume_automatic),
                 pystray.MenuItem('Nuevo chat', self.new_chat),
                 pystray.MenuItem('Salir', self.exit)))
 
@@ -287,6 +313,8 @@ class Monitor:
             logging.exception('No se pudo mostrar la notificacion de Windows')
 
     def request_switch(self, icon=None, item=None, *, reason='manual'):
+        if reason == 'automatico' and rotation_blocked():
+            return
         if not self.switch_lock.acquire(blocking=False):
             self.notify('Ya hay un cambio de cuenta en curso')
             return
@@ -311,19 +339,29 @@ class Monitor:
             self.status = f'Cuenta {destination} activa'
             self.notify(self.status)
         except Exception:
+            block_rotation('Fallo de rotacion; requiere reanudacion manual desde la bandeja')
             logging.exception('ROTACION ERROR motivo=%s C%s -> C%s', reason, active, destination)
-            self.status = 'Error al cambiar; revisar monitor_cuota.log'
+            self.status = 'Cambio fallido; automatico pausado (sin reintentos)'
             self.notify(self.status)
         finally:
             self.switch_lock.release()
             self.quota_wakeup.set()
 
     def check_automatic(self):
+        if rotation_blocked():
+            return
         active = active_account()
         with self.lock:
             quotas = dict(self.quotas)
         if time.time() >= self.next_switch and should_switch(active, quotas, latest_write(), time.time()):
             self.request_switch(reason='automatico')
+
+    def resume_automatic(self, icon=None, item=None):
+        ROTATION_STATE.unlink(missing_ok=True)
+        self.next_switch = time.time() + 120
+        self.status = 'Cambios automaticos reanudados; espera de 120 segundos'
+        logging.info('ROTACION automatica reanudada manualmente')
+        self.notify(self.status)
 
     def new_chat(self, icon=None, item=None):
         trigger_new_chat()

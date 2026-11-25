@@ -107,6 +107,8 @@ def build(desktop: Path, drive: Path):
                        cwd=stage, check=True)
         subprocess.run([str(ROOT / '.venv/Scripts/python.exe'),
                         str(stage / 'scripts/test_v8_reinstalacion.py')], cwd=stage, check=True)
+        subprocess.run([str(ROOT / '.venv/Scripts/python.exe'),
+                        str(stage / 'scripts/test_rotacion_cuota.py')], cwd=stage, check=True)
         subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
                         '-File', str(stage / 'scripts/test_github_pc.ps1')], cwd=stage, check=True)
         zip_path = Path(tmp) / (NAME + '.zip')
