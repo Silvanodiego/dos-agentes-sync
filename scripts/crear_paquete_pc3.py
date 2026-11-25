@@ -68,7 +68,12 @@ def build(desktop: Path, drive: Path):
         required = ('instalar.bat', 'scripts/instalar_pc3.ps1', 'scripts/configurar_pc3.py',
                     'scripts/esquemas_pc3.py', 'scripts/node_pc3.ps1',
                     'scripts/copiar_paquete_pc.ps1', 'scripts/validar_scripts_protegidos.py',
-                    'scripts/test_copiar_paquete_pc.ps1',
+                    'scripts/test_copiar_paquete_pc.ps1', 'scripts/github_pc.ps1',
+                    'scripts/verificar_npm_instalado.py', 'activar_chats_esta_pc.bat',
+                    'scripts/chats/registrar_activacion_automatica.ps1',
+                    'scripts/chats/activar_cuando_listo.py', 'scripts/chats/sync_chats_abierto.py',
+                    'scripts/chats/proyectos_portables.py', 'scripts/chats/continuidad_chats.py',
+                    'scripts/chats/rutas_historial.py',
                     'runtime/installers/node-v24.22.3-win-x64.zip', 'arrancar_todo_oculto.vbs',
                     'chat_fijo_gemini.py', 'piloto_gemini.py', 'abrir_chrome_gemini.bat',
                     'abrir_chrome_gemini_oculto.bat', 'AGENTS.md', 'agy.bat',
@@ -100,8 +105,12 @@ def build(desktop: Path, drive: Path):
         subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
                         '-File', str(stage / 'scripts/test_copiar_paquete_pc.ps1')],
                        cwd=stage, check=True)
+        subprocess.run([str(ROOT / '.venv/Scripts/python.exe'),
+                        str(stage / 'scripts/test_v8_reinstalacion.py')], cwd=stage, check=True)
+        subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                        '-File', str(stage / 'scripts/test_github_pc.ps1')], cwd=stage, check=True)
         zip_path = Path(tmp) / (NAME + '.zip')
-        with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9,
+        with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6,
                              strict_timestamps=False) as archive:
             for path in sorted(stage.rglob('*')):
                 if path.is_file():

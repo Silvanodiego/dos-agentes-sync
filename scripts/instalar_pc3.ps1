@@ -6,6 +6,7 @@ $source = Split-Path $PSScriptRoot -Parent
 $repo = 'https://github.com/Silvanodiego/dos-agentes-sync.git'
 . (Join-Path $PSScriptRoot 'node_pc3.ps1')
 . (Join-Path $PSScriptRoot 'copiar_paquete_pc.ps1')
+. (Join-Path $PSScriptRoot 'github_pc.ps1')
 function Paso($n, $text) { Write-Host "`n[$n/6] $text" -ForegroundColor Cyan }
 function Refresh-Path {
     $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User') + ";$env:ProgramFiles\nodejs;$env:ProgramFiles\Git\cmd;$env:LOCALAPPDATA\Microsoft\WindowsApps"
@@ -55,8 +56,9 @@ try {
         exit $child.ExitCode
     }
     Refresh-Path
-    Paso 2 'Preparando Git y repositorio main...'
+    Paso 2 'Preparando Git, acceso GitHub y repositorio main...'
     if (!(Get-Command git.exe -ErrorAction SilentlyContinue)) { Winget 'Git.Git' }
+    Ensure-GitHubAccess
     $cloneSource = Join-Path $source 'git_bundles\dos-agentes-sync.bundle'
     if (!(Test-Path -LiteralPath $cloneSource)) { throw 'Falta el bundle Git principal.' }
     if (!(Test-Path -LiteralPath $Destino)) {
@@ -89,9 +91,12 @@ try {
     $venv = Join-Path $Destino '.venv'
     $py = Join-Path $venv 'Scripts\python.exe'
     if (!(Test-Path -LiteralPath $py)) { Run -exe $python.Source -Arguments @('-m','venv',$venv) }
-    Run -exe $py -Arguments @('-m','pip','install','--upgrade','pip')
+    # pip reutiliza paquetes que ya satisfacen requirements; no actualiza todo por reinstalar.
+    Run -exe $py -Arguments @('-m','pip','--version')
     Run -exe $py -Arguments @('-m','pip','install','-r','requirements.txt','-r','requirements_chat_fijo.txt','-r','requirements_instalacion.txt')
-    Run -exe $py -Arguments @('-m','pip','install','.\repos_referencia\token-saver')
+    & $py (Join-Path $Destino 'scripts\verificar_token_saver.py') (Join-Path $Destino 'repos_referencia\token-saver')
+    if ($LASTEXITCODE -eq 0) { Write-Host 'token-saver: version requerida ya instalada; se reutiliza.' }
+    else { Run -exe $py -Arguments @('-m','pip','install','.\repos_referencia\token-saver') }
     if (Test-Path 'repos_referencia\Agentic-SEO-Skill\requirements.txt') {
         Run -exe $py -Arguments @('-m','pip','install','-r','repos_referencia\Agentic-SEO-Skill\requirements.txt')
     }
@@ -134,9 +139,25 @@ try {
         $env:PYTHON = $gypPython
         Run -exe npm.cmd -Arguments $NpmArguments
     }
-    Npm-Install -NpmArguments @('ci','--no-audit','--no-fund')
+    & $py (Join-Path $Destino 'scripts\verificar_npm_instalado.py') $Destino
+    $npmReady = $LASTEXITCODE -eq 0
+    if ($npmReady) {
+        & npm.cmd ls --depth=0 --omit=optional
+        $npmReady = $LASTEXITCODE -eq 0
+    }
+    if ($npmReady) { Write-Host 'npm local: versiones del lockfile ya instaladas; se reutilizan.' }
+    else { Npm-Install -NpmArguments @('ci','--no-audit','--no-fund') }
     $globals = Get-Content 'dependencias\npm_globales.json' -Raw -Encoding UTF8 | ConvertFrom-Json
     foreach ($package in $globals.PSObject.Properties) {
+        $globalJson = & npm.cmd ls --global --depth=0 --json $package.Name
+        $globalOk = $LASTEXITCODE -eq 0
+        if ($globalOk) {
+            try {
+                $current = ($globalJson | Out-String | ConvertFrom-Json).dependencies.PSObject.Properties[$package.Name]
+                $globalOk = $null -ne $current -and $current.Value.version -eq $package.Value.version
+            } catch { $globalOk = $false }
+        }
+        if ($globalOk) { Write-Host "Reutilizando paquete global $($package.Name)@$($package.Value.version)"; continue }
         Write-Host "Instalando paquete global $($package.Name)@$($package.Value.version)..."
         Npm-Install -NpmArguments @('install','--global',($package.Name + '@' + $package.Value.version),'--no-audit','--no-fund')
     }
@@ -184,6 +205,7 @@ try {
     $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet -Hidden -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 8)
     Register-ScheduledTask -TaskName 'DosAgentesGitSync' -Description 'auto_sync_git silencioso cada 10 minutos' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+    Run -exe powershell.exe -Arguments @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $Destino 'scripts\chats\registrar_activacion_automatica.ps1'),'-Root',$Destino)
     Paso 6 'Iniciando servicios...'
     Start-Process -FilePath $manager -WorkingDirectory (Split-Path $manager -Parent) -WindowStyle Hidden | Out-Null
     # Inicio local inmediato; la sincronizacion Git queda en la tarea periodica.

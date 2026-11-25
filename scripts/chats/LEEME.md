@@ -97,3 +97,13 @@ futuros, prefijos Windows, carpetas pendientes, ramas concurrentes, archivado
 reversible y offsets tras reubicacion. La prueba nativa aislada tambien verifico
 thread/read + thread/resume con cwd trasladado a otra raiz y project_id local.
 No solicita inferencia ni certifica el refresco de la barra lateral.
+
+## Instalador V8
+
+V8 registra CodexChatsAutoSetup sin ventana cada dos minutos y al login. Cuando
+Drive sincroniza la carpeta existente CodexSync/live-v1 y Codex tiene ambas bases
+nativas, activa CodexChatsSyncLive y deshabilita el bootstrap. No cierra Codex.
+Si falta Drive o la inicializacion/login de Codex, activation-status.json en
+LOCALAPPDATA/CodexSync informa pending con la causa; no declara chats sincronizados.
+Reinstalar vuelve a comprobar requisitos y registra la misma tarea sin duplicarla.
+Los limites de visibilidad de barra lateral y verificacion fisica siguen vigentes.
