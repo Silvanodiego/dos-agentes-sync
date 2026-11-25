@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from datetime import datetime, timezone, timedelta
 
 from verificar_npm_instalado import installed
 from verificar_token_saver import source_version
@@ -56,11 +57,37 @@ class ReinstallTests(unittest.TestCase):
             def run(command, **options):
                 calls.append(command)
                 return subprocess.CompletedProcess(command, 0, 'Activa', '')
-            result = activation.activate(Path(temp), Path(temp) / 'activation.json', runner=run)
+            result = activation.activate(Path(temp), Path(temp) / 'activation.json', runner=run,
+                                         verifier=lambda *args: (True, 'sync verificada'))
             self.assertEqual(result['status'], 'activated')
             self.assertEqual(len(calls), 2)
             self.assertIn('CodexChatsAutoSetup', calls[1][-1])
             self.assertNotIn('CodexChatsSyncLive', calls[1][-1])
+
+    def test_registered_task_without_success_keeps_bootstrap(self):
+        with tempfile.TemporaryDirectory() as temp:
+            calls = []
+            def run(command, **options):
+                calls.append(command)
+                return subprocess.CompletedProcess(command, 0, 'Tarea registrada', '')
+            result = activation.activate(Path(temp), Path(temp) / 'activation.json', runner=run,
+                                         verifier=lambda *args: (False, 'Worker bloqueado'))
+            self.assertEqual(result['status'], 'pending')
+            self.assertEqual(len(calls), 1)
+            self.assertIn('Worker bloqueado', result['detail'])
+
+    def test_first_sync_requires_fresh_success_not_stale_or_blocked_status(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'live-sync-status.json'
+            started = datetime.now(timezone.utc)
+            for status, checked, expected in (
+                ('synchronized_live', started - timedelta(minutes=1), False),
+                ('blocked', started + timedelta(seconds=1), False),
+                ('partial_live', started + timedelta(seconds=1), False),
+                ('synchronized_live', started + timedelta(seconds=1), True),
+            ):
+                path.write_text(json.dumps({'status': status, 'checked_at_utc': checked.isoformat()}))
+                self.assertEqual(activation.wait_for_sync(path, started, timeout=0)[0], expected)
 
     def test_timeout_is_pending_and_keeps_retry_available(self):
         with tempfile.TemporaryDirectory() as temp:

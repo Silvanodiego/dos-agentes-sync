@@ -414,3 +414,9 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - Verificacion del ZIP detecto PSModulePath heredado de PowerShell 7 en pruebas PowerShell 5.1 (Get-FileHash no disponible). El constructor ahora usa rutas de modulos Windows PowerShell, igual que instalar.bat; se repite la verificacion completa antes de entregar.
 - Test de rotacion aisla tambien logging: no crea archivos fuera del manifiesto ni escribe fallos simulados en el registro del monitor real.
 - Empaquetador desactiva bytecode en subprocesos de prueba (PYTHONDONTWRITEBYTECODE) para no agregar __pycache__ fuera del manifiesto; diferencias de contenido informan ahora nombres exactos antes de entregar.
+
+### 2026-11-24 - Revision tras instalacion V8 sin chats visibles
+- PC1: solo se observa PC1.json en el transporte compartido; no hay evidencia de ejecucion ni subida de PC2/PC3. Error temporal WAL_WITHOUT_SHM a las 22:01 se recupero en la siguiente ejecucion: 58 chats/19 proyectos exportados, cero objetos pendientes a las 22:03. La subida efectiva a Google Drive y el estado remoto siguen sin verificar.
+- scripts/chats/activar_cuando_listo.py: no deshabilita el bootstrap ni marca activated por registrar una tarea. Exige resultado synchronized_live nuevo de la primera ejecucion; status ausente, antiguo, parcial o bloqueado conserva pending y su causa.
+- scripts/test_v8_reinstalacion.py: 7 pruebas aprobadas, incluyendo registro exitoso con worker fallido y rechazo de resultados antiguos/parciales/bloqueados.
+- revisar_chats_v8.bat y scripts/chats/diagnosticar_sync.ps1: actualizacion ff-only y reactivacion sin cerrar Codex, con informe legible de tareas, errores, bases (solo nombres) y manifiestos Drive; no lee credenciales ni contenido de chats.
