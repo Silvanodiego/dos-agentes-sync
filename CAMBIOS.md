@@ -446,8 +446,4 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - scripts/chats/activar_cuando_listo.py: no deshabilita el bootstrap ni marca activated por registrar una tarea. Exige resultado synchronized_live nuevo de la primera ejecucion; status ausente, antiguo, parcial o bloqueado conserva pending y su causa.
 - scripts/test_v8_reinstalacion.py: 7 pruebas aprobadas, incluyendo registro exitoso con worker fallido y rechazo de resultados antiguos/parciales/bloqueados.
 - revisar_chats_v8.bat y scripts/chats/diagnosticar_sync.ps1: actualizacion ff-only y reactivacion sin cerrar Codex, con informe legible de tareas, errores, bases (solo nombres) y manifiestos Drive; no lee credenciales ni contenido de chats.
-
-### 2026-11-25 - Reglas permanentes y modulo temporal de Codex
-- Alta de `.agents\rules\workspace-rules.md` como base permanente para Antigravity IDE.
-- Alta de `codex_temporal\` (`auditar_diff.ps1`, `correr_tests.ps1`) y `desactivar_codex.ps1` para desmontaje limpio de Codex a fin de mes.
 - 2026-11-25: Respaldo de AGENTS.md anterior en `config_backups/AGENTS_viejo_cascada_20261125.md`; reglas limpias unificadas en `AGENTS.md` y `config_compartida/AGENTS.md`, eliminando la carpeta duplicada `.agents/`.
