@@ -450,3 +450,4 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 ### 2026-11-25 - Reglas permanentes y modulo temporal de Codex
 - Alta de `.agents\rules\workspace-rules.md` como base permanente para Antigravity IDE.
 - Alta de `codex_temporal\` (`auditar_diff.ps1`, `correr_tests.ps1`) y `desactivar_codex.ps1` para desmontaje limpio de Codex a fin de mes.
+- 2026-11-25: Respaldo de AGENTS.md anterior en `config_backups/AGENTS_viejo_cascada_20261125.md`; reglas limpias unificadas en `AGENTS.md` y `config_compartida/AGENTS.md`, eliminando la carpeta duplicada `.agents/`.

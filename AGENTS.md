@@ -1,4 +1,3 @@
----
 # Reglas Permanentes del Workspace (Antigravity IDE)
 
 ## 1. Integridad y archivos existentes
@@ -25,4 +24,3 @@ Si una tarea se traba o requiere frenar por riesgo (permisos, red, datos, hardwa
 - Trabajar desde `C:\dos_agentes_local`.
 - Al terminar cambios aprobados: verificar estado, hacer `git add` respetando `.gitignore`, `git commit` breve y `git push`.
 - Si falla la red o el remoto, conservar el commit local e informar el pendiente.
----
