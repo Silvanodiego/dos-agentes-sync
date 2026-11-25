@@ -44,6 +44,8 @@ def allowed(relative):
 
 
 def build(desktop: Path, drive: Path):
+    # Las pruebas importan modulos del paquete: no generar caches fuera del manifiesto.
+    os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
     # Los tests Windows PowerShell 5.1 no deben heredar modulos de pwsh 7.
     os.environ['PSModulePath'] = os.pathsep.join((
         str(Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/Modules'),
@@ -124,7 +126,11 @@ def build(desktop: Path, drive: Path):
         with zipfile.ZipFile(zip_path) as archive:
             assert archive.testzip() is None
             actual = {n.removeprefix(NAME + '/') for n in archive.namelist()}
-            assert actual == {row['path'] for row in rows} | {'MANIFIESTO_SHA256.json'}
+            expected = {row['path'] for row in rows} | {'MANIFIESTO_SHA256.json'}
+            if actual != expected:
+                raise RuntimeError('Contenido ZIP diferente del manifiesto: extra=' +
+                                   repr(sorted(actual - expected)) + '; faltante=' +
+                                   repr(sorted(expected - actual)))
             for row in rows:
                 assert allowed(row['path']), row['path']
                 assert hashlib.sha256(archive.read(NAME + '/' + row['path'])).hexdigest() == row['sha256']
