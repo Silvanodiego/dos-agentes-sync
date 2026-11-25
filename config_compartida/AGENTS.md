@@ -24,3 +24,10 @@ Si una tarea se traba o requiere frenar por riesgo (permisos, red, datos, hardwa
 - Trabajar desde `C:\dos_agentes_local`.
 - Al terminar cambios aprobados: verificar estado, hacer `git add` respetando `.gitignore`, `git commit` breve y `git push`.
 - Si falla la red o el remoto, conservar el commit local e informar el pendiente.
+
+## Continuidad automática entre PCs (sin sincronizar chats)
+
+- Al iniciar una tarea en un chat nuevo, leé primero `ESTADO.md` en la raíz del proyecto actual si existe.
+- Al terminar cualquier tarea que modifique archivos (sin esperar a que el usuario diga "terminamos"), sobrescribí `ESTADO.md` en la raíz del proyecto actual en UTF-8 sin BOM (máximo 25 líneas: fecha, qué quedó hecho/verificado, qué falló o quedó bloqueado, y próximo paso exacto).
+- Si el proyecto tiene Git, incluí `ESTADO.md` en el commit/push. No actualices `ESTADO.md` en consultas de solo lectura.
+- Solo si trabajás en una carpeta local sin Git ni sincronización en la nube, guardá el respaldo en `C:\dos_agentes_local\project_states\ESTADO_<PROYECTO>.md`.

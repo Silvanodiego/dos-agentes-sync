@@ -447,3 +447,7 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - scripts/test_v8_reinstalacion.py: 7 pruebas aprobadas, incluyendo registro exitoso con worker fallido y rechazo de resultados antiguos/parciales/bloqueados.
 - revisar_chats_v8.bat y scripts/chats/diagnosticar_sync.ps1: actualizacion ff-only y reactivacion sin cerrar Codex, con informe legible de tareas, errores, bases (solo nombres) y manifiestos Drive; no lee credenciales ni contenido de chats.
 - 2026-11-25: Respaldo de AGENTS.md anterior en `config_backups/AGENTS_viejo_cascada_20261125.md`; reglas limpias unificadas en `AGENTS.md` y `config_compartida/AGENTS.md`, eliminando la carpeta duplicada `.agents/`.
+
+### 2026-11-25 - Continuidad automática por proyecto
+- AGENTS.md y config_compartida/AGENTS.md: agregada al final la sección solicitada de ESTADO.md, conservando todos los bytes originales y UTF-8 sin BOM.
+- ESTADO.md: registro de continuidad de esta tarea; bridge_server.py sin modificaciones.
