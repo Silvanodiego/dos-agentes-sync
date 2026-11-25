@@ -385,3 +385,13 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - PC1: tarea CodexChatsSyncLive sigue activa cada dos minutos y al iniciar sesion, con Codex abierto. Catalogo exportado: 19 proyectos, 56 conversaciones, 13 versiones reanudables, 42 solo SQLite y una generacion pendiente. Los diez historiales recuperados, continuaciones y respaldos previos se conservan. Publicacion local no certifica propagacion remota de Drive.
 - Limite comprobado: un proyecto temporal creado por API nativa no aparecio en list_projects del escritorio abierto; fue eliminado al terminar. Falta integrar/verificar el refresco de la barra lateral y probar PC1 -> PC2/PC3. No se sobrescribio el estado global de la app ni se anuncia solucion integral terminada. LEEME.md explica este limite y la activacion preparada.
 - bridge_server.py, consultar_gemini.py y bucle_autonomo.py conservan sus SHA256 originales. AGENTS.md no se modifico. Cascada AG fallo HTTP502 all_models_failed; no se reintento inferencia y se verifico adaptador agy. Chat Fijo Gemini tenia borrador previo conservado, sin reenviar la consulta fallida.
+
+
+## 2026-11-24 - Instalador V8: conservar scripts diferentes en PC2
+- scripts/copiar_paquete_pc.ps1: conserva bridge_server.py, consultar_gemini.py y bucle_autonomo.py existentes aunque difieran del paquete, sin bloquear el resto. Guarda hashes y estado en logs/instalacion_archivos_protegidos.json; no oculta diferencias.
+- scripts/instalar_pc3.ps1: usa la copia conservadora y valida sintaxis sin ejecutar los scripts protegidos; advierte que una version local diferente requiere verificar compatibilidad en esa PC.
+- scripts/validar_scripts_protegidos.py: comprobacion AST sin importar servicios ni escribir los protegidos.
+- scripts/test_copiar_paquete_pc.ps1: prueba destino limpio, identico, divergente y reanudacion preservando hashes y fechas.
+- instalar.bat, scripts/crear_paquete_pc3.py y scripts/ecosistema_paquete_pc3.py: version V8 para PC2/PC3; conserva Node24 ZIP y pruebas de argumentos winget; manifiesto y validaciones dentro del empaquetado.
+- No se modificaron los tres scripts protegidos. Las pruebas locales no sustituyen ejecutar instalar.bat en PC2; no se da por verificada esa PC.
+- Verificacion: prueba real en fixtures limpio/identico/divergente/reanudacion y test de argv winget aprobados; sintaxis AST de los tres protegidos aprobada. Consulta Cascada AG revisada localmente. Chat Fijo no envio consulta: detecto borrador preexistente y lo conservo intacto.

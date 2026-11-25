@@ -5,6 +5,7 @@ $ProgressPreference = 'Continue'
 $source = Split-Path $PSScriptRoot -Parent
 $repo = 'https://github.com/Silvanodiego/dos-agentes-sync.git'
 . (Join-Path $PSScriptRoot 'node_pc3.ps1')
+. (Join-Path $PSScriptRoot 'copiar_paquete_pc.ps1')
 function Paso($n, $text) { Write-Host "`n[$n/6] $text" -ForegroundColor Cyan }
 function Refresh-Path {
     $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User') + ";$env:ProgramFiles\nodejs;$env:ProgramFiles\Git\cmd;$env:LOCALAPPDATA\Microsoft\WindowsApps"
@@ -40,7 +41,7 @@ function Check-Package {
     foreach ($group in @('codex\skills','codex\plugins','codex\marketplaces','repos_referencia\token-saver','ScriptsGlobales\modulos_enjambre','runtime\agy','runtime\installers','git_bundles')) {
         if (!(Test-Path -LiteralPath (Join-Path $source $group) -PathType Container)) { throw "Falta grupo del ecosistema: $group" }
     }
-    Write-Host "Integridad correcta: $($manifest.files.Count) archivos, paquete v7."
+    Write-Host "Integridad correcta: $($manifest.files.Count) archivos, paquete v8."
 }
 try {
     Paso 1 'Verificando integridad...'
@@ -74,15 +75,7 @@ try {
     if ($branch.Trim() -ne 'main') { throw 'El destino no esta en main. Se conserva la rama actual.' }
     if ([IO.Path]::GetFullPath($source).TrimEnd('\') -ne [IO.Path]::GetFullPath($Destino).TrimEnd('\')) {
         $manifest = Get-Content (Join-Path $source 'MANIFIESTO_SHA256.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-        foreach ($entry in $manifest.files) {
-            $target = Join-Path $Destino $entry.path
-            if ((Test-Path -LiteralPath $target) -and $entry.path -match '(^|/)(bridge_server|consultar_gemini|bucle_autonomo)\.py$') {
-                if ((Get-FileHash -LiteralPath $target).Hash -ne $entry.sha256) { throw "Script protegido distinto en destino: $($entry.path). No fue modificado." }
-                continue
-            }
-            New-Item -ItemType Directory -Force -Path (Split-Path $target -Parent) | Out-Null
-            Copy-Item -LiteralPath (Join-Path $source $entry.path) -Destination $target -Force
-        }
+        Copy-PackageFiles -SourceRoot $source -DestinationRoot $Destino -Manifest $manifest
     }
     Set-Location $Destino
     Paso 3 'Instalando Python/pip y dependencias...'
@@ -102,6 +95,7 @@ try {
     if (Test-Path 'repos_referencia\Agentic-SEO-Skill\requirements.txt') {
         Run -exe $py -Arguments @('-m','pip','install','-r','repos_referencia\Agentic-SEO-Skill\requirements.txt')
     }
+    Run -exe $py -Arguments @((Join-Path $Destino 'scripts\validar_scripts_protegidos.py'), $Destino)
     Paso 4 'Instalando Node.js y paquetes npm (salida en vivo)...'
     Install-Node24 -Root $Destino -Persist
     function Npm-Install {
@@ -195,7 +189,8 @@ try {
     # Inicio local inmediato; la sincronizacion Git queda en la tarea periodica.
     Run -exe $py -Arguments @('scripts\configurar_pc3.py','--root',$Destino,'--home',$env:USERPROFILE,'--iniciar')
     Start-Process -FilePath "$env:WINDIR\System32\cmd.exe" -ArgumentList ('/d /s /c ""' + (Join-Path $Destino 'abrir_chrome_gemini_oculto.bat') + '""') -WorkingDirectory $Destino -WindowStyle Hidden | Out-Null
-    Write-Host 'INSTALACION COMPLETA - v7' -ForegroundColor Green
+    if ($script:PreservedDifferences.Count) { Write-Warning 'Instalacion terminada conservando scripts locales diferentes: revise logs\instalacion_archivos_protegidos.json. Compatibilidad funcional pendiente de comprobar en esta PC.' }
+    Write-Host 'INSTALACION COMPLETA - v8' -ForegroundColor Green
     Write-Host 'Debe volver a autenticar las cuentas en Antigravity Manager y Gemini: no se migraron credenciales ni perfiles DPAPI.' -ForegroundColor Yellow
     Write-Host 'Codex usa la exportacion auth_c1.json si no existia auth.json. Si expiro su sesion, vuelva a iniciar sesion. Gemini: abrir_chrome_gemini.bat.'
     exit 0
