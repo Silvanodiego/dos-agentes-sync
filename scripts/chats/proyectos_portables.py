@@ -178,6 +178,7 @@ class ProjectRegistry:
         self.projects = state.setdefault('project_bindings', {})
         self.existing = {}
         with closing(sqlite3.connect(state_db)) as db:
+            self.native_projects = bool(db.execute("SELECT 1 FROM sqlite_master WHERE name='projects'").fetchone())
             if db.execute("SELECT 1 FROM sqlite_master WHERE name='projects'").fetchone():
                 for pid, in db.execute('SELECT id FROM projects'):
                     roots = tuple(normalized(r[0]) for r in db.execute('SELECT path FROM project_roots WHERE project_id=? ORDER BY position', (pid,)))
@@ -190,6 +191,13 @@ class ProjectRegistry:
         if not roots or any(not p.is_dir() for p in roots):
             raise ValueError('Carpeta de proyecto pendiente de Drive/mapeo: ' + project['name'])
         signature = tuple(normalized(path) for path in roots)
+        if not self.native_projects:
+            # Legacy installations associate conversations through cwd. Preserve
+            # the portable binding without calling an unsupported project API or
+            # rewriting the global UI settings while Codex is open.
+            self.projects[project['key']] = {'id': None, 'roots': [str(p) for p in roots],
+                                             'name': project['name'], 'mode': 'cwd_only'}
+            return None
         pid = self.existing.get(signature)
         if pid is None:
             if self.rpc is None:

@@ -51,6 +51,8 @@ def archive_superseded(home, state, live):
     lineage = state.get('replica_lineage', {})
     if not lineage:
         return 0
+    if live.dbpath(home, 'thread_history_[0-9]*.sqlite', optional=True) is None:
+        return 0  # Keep predecessors visible when native turn state is unavailable.
     archived = 0
     with closing(sqlite3.connect(live.dbpath(home, 'state_[0-9]*.sqlite'), timeout=5)) as db, \
          closing(sqlite3.connect(live.dbpath(home, 'thread_history_[0-9]*.sqlite'), timeout=5)) as history:

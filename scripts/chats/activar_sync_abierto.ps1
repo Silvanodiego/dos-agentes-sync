@@ -3,7 +3,7 @@
 param(
     [string]$CloudRoot = '',
     [string]$MachineId = ($env:COMPUTERNAME + '-' + $env:USERNAME),
-    [string]$CodexHome = (Join-Path $env:USERPROFILE '.codex'),
+    [string]$CodexHome = $(if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }),
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'CodexSync'),
     [string]$PythonExecutable = 'C:\dos_agentes_local\.venv\Scripts\pythonw.exe'
 )
@@ -31,10 +31,13 @@ foreach ($file in @($worker, $PythonExecutable)) {
 foreach ($module in @('proyectos_portables.py', 'continuidad_chats.py', 'rutas_historial.py', 'backup_chats.py', 'coverage_chats.py')) {
     if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $module) -PathType Leaf)) { throw "Falta el modulo $module; actualice el repositorio completo" }
 }
-foreach ($pattern in @('state_*.sqlite', 'thread_history_*.sqlite')) {
+foreach ($pattern in @('state_*.sqlite')) {
     if (@(Get-ChildItem -LiteralPath $CodexHome -Filter $pattern -File).Count -ne 1) {
-        throw "Falta la base nativa unica $pattern en $CodexHome; abrir Codex e iniciar un chat primero"
+        throw "No se encontro un indice nativo unico $pattern en $CodexHome. Se conserva el historial; formato aun no compatible."
     }
+}
+if (@(Get-ChildItem -LiteralPath $CodexHome -Filter 'thread_history_*.sqlite' -File).Count -gt 1) {
+    throw 'Hay varias bases thread_history; no se elige una arbitrariamente.'
 }
 New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
 $state = Join-Path $InstallRoot ('live-state-' + $MachineId + '.json')

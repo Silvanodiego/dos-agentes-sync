@@ -26,10 +26,10 @@ def wait_for_sync(path, started_at, timeout=60):
         time.sleep(1)
 
 
-def activate(root, status, runner=subprocess.run, verifier=wait_for_sync):
+def activate(root, status, runner=subprocess.run, verifier=wait_for_sync, pythonw=None):
     command = ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
                str(root / 'scripts/chats/activar_sync_abierto.ps1'),
-               '-PythonExecutable', str(root / '.venv/Scripts/pythonw.exe')]
+               '-PythonExecutable', str(pythonw or root / '.venv/Scripts/pythonw.exe')]
     env = dict(os.environ)
     env.pop('PSModulePath', None)
     options = dict(capture_output=True, text=True, errors='replace', timeout=100,
@@ -59,7 +59,8 @@ def activate(root, status, runner=subprocess.run, verifier=wait_for_sync):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=Path, required=True)
+    parser.add_argument('--pythonw', type=Path)
     args = parser.parse_args()
     status = Path(os.environ['LOCALAPPDATA']) / 'CodexSync/activation-status.json'
-    state = activate(args.root, status)
+    state = activate(args.root, status, pythonw=args.pythonw)
     print(state['status'] + ': ' + state['detail'])

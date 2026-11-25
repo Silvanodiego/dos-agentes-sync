@@ -1,5 +1,31 @@
 # Registro de cambios
 
+## 2026-11-24 - Reparacion V8: formatos nativos distintos y Git local bloqueado
+
+- `scripts/chats/sync_chats_abierto.py`: detecta el indice SQLite con o sin
+  historial separado, exporta JSONL, detecta turnos activos en sus eventos e
+  importa columnas compatibles usando exclusivamente valores nativos.
+  No crea bases de historial faltantes ni inventa campos requeridos. Un modo
+  de historial desconocido se informa conservando el contenido.
+- `continuidad_chats.py`: conserva antecesores visibles cuando falta el estado
+  nativo de turnos. `proyectos_portables.py`: asocia por cwd en instalaciones
+  sin tabla de proyectos; no llama APIs de proyectos que esa version no tiene.
+- Activadores PowerShell/Python respetan CODEX_HOME, permiten un ejecutable
+  Python separado del codigo del worker y ya no exigen thread_history.
+- `scripts/chats/reparar_aislado.ps1` y `scripts/crear_reparacion_chats.py`:
+  generan un BAT autocontenido con SHA256 y once modulos allowlist, sin datos
+  personales. Se instala en LOCALAPPDATA/CodexSync/runner-hash, respalda tareas,
+  conserva modulos modificados y verifica una sincronizacion reciente.
+  Evita el Git sucio de la instalacion V8; no lo resetea ni lo sobrescribe.
+- `REPARACION_V8.md`, `test_formatos_chats.py` y `test_reparacion_chats.py`:
+  documentacion, pruebas de formatos, defaults, campos incompatibles, estado
+  parcial, checksum, extraccion repetida y sintaxis de PowerShell5.1.
+- No se declara soporte de formatos futuros desconocidos ni refresco visual
+  de la app verificado. Historias sin rollout y generaciones en curso producen
+  estado parcial. La PC destino debe ejecutar el reparador para comprobar su
+  formato real; no se verifico remotamente ni se alteraron tareas de PC1.
+- bridge_server.py, consultar_gemini.py y bucle_autonomo.py: intactos por SHA256.
+
 ## 2026-11-24 - PC 3 v7: instalacion completa de Node sin bloqueo MSI 1603
 
 - `scripts/node_pc3.ps1` instala la distribucion oficial Node24.22.3 x64,

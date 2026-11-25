@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 import base64
-from contextlib import closing
+from contextlib import closing, nullcontext
 from datetime import datetime, timezone
 import gzip
 import hashlib
@@ -52,14 +52,35 @@ def atomic(path, data):
 
 def rows(db, table, thread_id):
     # table is always selected from the constant allowlist, never from a bundle.
+    if db is None:
+        return []
+    if not columns(db, table):
+        return []
     return sorted([dict(r) for r in db.execute('SELECT * FROM ' + table + ' WHERE thread_id=?', (thread_id,))], key=encoded)
 
 
-def dbpath(home, pattern):
+def dbpath(home, pattern, optional=False):
     files = list(home.glob(pattern))
+    if not files and optional:
+        return None
     if len(files) != 1 or files[0].is_symlink():
         raise ValueError('Se requiere una unica base regular: ' + pattern)
     return files[0]
+
+
+def rollout_busy(raw):
+    """JSONL-era Codex has no thread_turns table; inspect native turn events."""
+    active = False
+    for line in raw.splitlines():
+        record = json.loads(line)
+        if record.get('type') != 'event_msg':
+            continue
+        kind = record.get('payload', {}).get('type')
+        if kind in ('task_started', 'turn_started'):
+            active = True
+        elif kind in ('task_complete', 'task_failed', 'turn_complete', 'turn_aborted'):
+            active = False
+    return active
 
 
 def read_object(cloud, key):
@@ -94,18 +115,22 @@ def publish_package(cloud, package):
 def export_live(home, cloud, machine, state, temporary):
     # Only allowlisted conversation DB tables are published, never whole DBs.
     source_state = dbpath(home, 'state_[0-9]*.sqlite')
-    source_history = dbpath(home, 'thread_history_[0-9]*.sqlite')
+    source_history = dbpath(home, 'thread_history_[0-9]*.sqlite', optional=True)
     deadline = time.monotonic() + 240
     _snapshot_sqlite(source_state, temporary / 'state.sqlite', deadline)
-    _snapshot_sqlite(source_history, temporary / 'history.sqlite', deadline)
+    if source_history is not None:
+        _snapshot_sqlite(source_history, temporary / 'history.sqlite', deadline)
     baselines = state.get('import_baselines', {})
     manifest = {'format': FORMAT, 'machine': machine,
                 'created_at': datetime.now(timezone.utc).isoformat(), 'chats': []}
     published = 0
     ready = missing = generating = 0
     with closing(sqlite3.connect(temporary / 'state.sqlite')) as db, \
-         closing(sqlite3.connect(temporary / 'history.sqlite')) as history:
-        db.row_factory = history.row_factory = sqlite3.Row
+         (closing(sqlite3.connect(temporary / 'history.sqlite')) if source_history else nullcontext()) as history:
+        db.row_factory = sqlite3.Row
+        if history is not None:
+            history.row_factory = sqlite3.Row
+        manifest['storage'] = 'sqlite_history' if history is not None else 'jsonl_index'
         projects, project_lookup, assignments = catalog(home, cloud, db)
         manifest['projects'] = projects
         for row in db.execute("SELECT * FROM threads ORDER BY id"):
@@ -114,7 +139,7 @@ def export_live(home, cloud, machine, state, temporary):
             if (thread.get('thread_source') not in (None, 'user', 'agent_created_thread') or
                 thread.get('attached_thread_parent_id') or
                 thread.get('source') not in ('vscode', 'cli', 'exec') or
-                not (thread.get('first_user_message') or thread.get('preview'))):
+                not (thread.get('first_user_message') or thread.get('preview') or thread.get('title'))):
                 continue
             tables = {name: rows(history, name, thread_id) for name in TABLES}
             turns = tables['thread_turns']
@@ -141,8 +166,11 @@ def export_live(home, cloud, machine, state, temporary):
                 target = temporary / 'rollout.jsonl'
                 target.unlink(missing_ok=True)
                 record = _snapshot_jsonl(rollout, target, deadline)
-                package['rollout'] = base64.b64encode(target.read_bytes()).decode('ascii')
+                raw = target.read_bytes()
+                package['rollout'] = base64.b64encode(raw).decode('ascii')
                 package['busy'] = busy or not record['last_line_terminated']
+                if record['last_line_terminated']:
+                    package['busy'] = package['busy'] or rollout_busy(raw)
             # An untouched replica must not echo back. A continued replica IS
             # a new local branch and must be published to the other PCs.
             fingerprint = history_fingerprint(tables, package['rollout'])
@@ -185,7 +213,8 @@ def export_live(home, cloud, machine, state, temporary):
     atomic(cloud / 'machines' / (machine + '.json'), encoded(manifest))
     return {'exported_chats': len(manifest['chats']), 'exported_projects': len(projects), 'new_objects': published,
             'ready_versions': ready, 'archived_sqlite_only': missing,
-            'generating_versions': generating, 'transport': 'Drive; subida remota no verificada'}
+            'generating_versions': generating, 'storage': manifest['storage'],
+            'transport': 'Drive; subida remota no verificada'}
 
 
 def columns(db, table):
@@ -199,6 +228,27 @@ def insert_row(db, table, row):
     quoted = ','.join('"' + n.replace('"', '""') + '"' for n in names)
     db.execute('INSERT INTO ' + table + ' (' + quoted + ') VALUES (' + ','.join('?' for _ in names) + ')',
                [row[n] for n in names])
+
+
+def compatible_thread(db, thread):
+    """Use native defaults only; never invent values for unknown required fields."""
+    schema = list(db.execute('PRAGMA table_info(threads)'))
+    names = {r[1] for r in schema}
+    required = {'id', 'rollout_path', 'cwd', 'created_at'}
+    if not required.issubset(names):
+        raise ValueError('Esquema threads desconocido; no se modifica la base nativa')
+    result = {k: v for k, v in thread.items() if k in names}
+    for _, name, _, notnull, default, primary in schema:
+        if name not in result and (notnull or primary) and default is None:
+            raise ValueError('Columna nativa obligatoria sin equivalencia: ' + name)
+    return result
+
+
+def insert_compatible_thread(db, thread):
+    names = list(thread)
+    quoted = ','.join('"' + n.replace('"', '""') + '"' for n in names)
+    db.execute('INSERT INTO threads (' + quoted + ') VALUES (' + ','.join('?' for _ in names) + ')',
+               [thread[n] for n in names])
 
 
 def validate_rollout(raw, source_id, new_id):
@@ -228,11 +278,13 @@ def import_version(home, package, key, ledger, default_cwd, baselines=None, regi
     # Deterministic version ID: repeat runs and interrupted imports are idempotent.
     new_id = str(uuid.uuid5(uuid.NAMESPACE_URL, FORMAT + ':' + package['machine'] + ':' + source_id + ':' + key))
     state_path = dbpath(home, 'state_[0-9]*.sqlite')
-    history_path = dbpath(home, 'thread_history_[0-9]*.sqlite')
+    history_path = dbpath(home, 'thread_history_[0-9]*.sqlite', optional=True)
     stamp = datetime.fromtimestamp(source['created_at'], timezone.utc).strftime('%Y-%m-%dT%H-%M-%S')
     rollout = home / 'sessions' / 'sync' / ('rollout-' + stamp + '-' + new_id + '.jsonl')
     raw = (validate_rollout(base64.b64decode(package['rollout'], validate=True), source_id, new_id)
            if package['rollout'] is not None else None)
+    if raw is not None and rollout_busy(raw):
+        return 'preserved_only'
     thread = dict(source, id=new_id, rollout_path=str(rollout), is_pinned=0,
                   project_id=None, thread_section_id=None, attached_thread_parent_id=None)
     name = re.sub(r'(?: \[sync [A-Za-z0-9_-]+\])+$', '', source.get('name') or source['title'])
@@ -250,12 +302,13 @@ def import_version(home, package, key, ledger, default_cwd, baselines=None, regi
     tables = package['tables']
     if raw is not None:
         raw, tables = relocate(raw, tables, source['cwd'], thread['cwd'])
-    expected_tables = {table: sorted([dict(row, thread_id=new_id) for row in tables[table]], key=encoded) for table in TABLES}
+    expected_tables = {table: sorted([dict(row, thread_id=new_id) for row in tables[table]], key=encoded)
+                      if history_path else [] for table in TABLES}
     baseline = history_fingerprint(expected_tables, base64.b64encode(raw).decode('ascii') if raw else None)
     # Stage file first, history second, visibility row last. A crash can leave
     # an invisible staged replica, never a half-replaced existing conversation.
     with closing(sqlite3.connect(state_path, timeout=5)) as db, \
-         closing(sqlite3.connect(history_path, timeout=5)) as history:
+         (closing(sqlite3.connect(history_path, timeout=5)) if history_path else nullcontext()) as history:
         existing = db.execute('SELECT rollout_path FROM threads WHERE id=?', (new_id,)).fetchone()
         if existing:
             # Native resume may relocate a canonical rollout. Verify its bytes.
@@ -270,11 +323,17 @@ def import_version(home, package, key, ledger, default_cwd, baselines=None, regi
             if registry is not None:
                 continuity.identity(package, key, new_id, registry.state)
             return 'already_imported'
-        if set(columns(db, 'threads')) != set(thread):
-            raise ValueError('Version de esquema incompatible: threads')
+        thread = compatible_thread(db, thread)
+        if history is None and 'history_mode' in thread:
+            # Only a native default proves the storage mode understood by this
+            # installation. Older schemas without this column need no mapping.
+            native_default = next(r[4] for r in db.execute('PRAGMA table_info(threads)') if r[1] == 'history_mode')
+            if native_default is None or native_default.strip("()\"' " ).lower() != 'jsonl':
+                raise ValueError('history_mode sin base ni valor nativo JSONL predeterminado; formato no compatible')
+            thread.pop('history_mode')
         for table in TABLES:
             for row in tables[table]:
-                if row.get('thread_id') != source_id or set(columns(history, table)) != set(row):
+                if row.get('thread_id') != source_id or (history is not None and set(columns(history, table)) != set(row)):
                     raise ValueError('Esquema/identidad de historial incompatible')
         if raw is None:
             pass  # Native paginated histories live in SQLite, not JSONL.
@@ -283,11 +342,14 @@ def import_version(home, package, key, ledger, default_cwd, baselines=None, regi
                 raise ValueError('Se conserva el rollout local diferente')
         else:
             atomic(rollout, raw)
-        with history:
+        with history if history is not None else nullcontext():
             # Only a deterministic ID absent from the threads table is resumed
             # after a crash. Verify, never overwrite previously staged rows.
-            history.row_factory = sqlite3.Row
+            if history is not None:
+                history.row_factory = sqlite3.Row
             for table in TABLES:
+                if history is None:
+                    continue
                 expected = [dict(row, thread_id=new_id) for row in tables[table]]
                 previous = rows(history, table, new_id)
                 if previous:
@@ -297,7 +359,7 @@ def import_version(home, package, key, ledger, default_cwd, baselines=None, regi
                     for row in expected:
                         insert_row(history, table, row)
         with db:
-            insert_row(db, 'threads', thread)
+            insert_compatible_thread(db, thread)
         ledger.add(new_id)
         if baselines is not None:
             baselines[new_id] = baseline
@@ -369,7 +431,8 @@ def sync_once(home, cloud, machine, state_path, default_cwd, registry_factory=Pr
     result['project_bindings'] = len(state.get('project_bindings', {}))
     atomic(state_path, encoded(state))
     result['checked_at_utc'] = datetime.now(timezone.utc).isoformat()
-    if result['pending_objects'] or result['pending_projects']:
+    if (result['pending_objects'] or result['pending_projects'] or result['preserved_only'] or
+        result['archived_sqlite_only']):
         result['status'] = 'partial_live'
     atomic(state_path.with_name('live-sync-status.json'), encoded(result))
     return result
