@@ -24,4 +24,4 @@ enabled = true
 command = 'cmd.exe'
 args = ['/d', '/c', '"%USERPROFILE%\ScriptsGlobales\antigravity_mcp.bat"']
 startup_timeout_sec = 30
-tool_timeout_sec = 180
+tool_timeout_sec = 500

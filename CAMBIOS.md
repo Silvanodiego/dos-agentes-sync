@@ -488,3 +488,10 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - scripts/test_gemini_mcp.mjs: 10 pruebas aprobadas, con mocks de Gemini, ejecucion local UTF-8, timeout real corto y descubrimiento MCP stdio de las tres herramientas sin consultas a modelos. Sintaxis validada con node --check.
 - .gitignore: excepcion limitada al respaldo MCP autorizado; bridge_server.py, piloto_gemini.py y chat_fijo_gemini.py conservan su SHA256.
 - Activacion: recargar el servidor MCP o abrir una nueva sesion. El cliente configurado tiene tool_timeout_sec=90; para permitir todo el presupuesto con recuperacion y reintento debe ajustarse a 500 en la seccion mcp_servers.antigravity_bridge. No se modifico config.toml.
+
+### 2026-11-25 - Timeout MCP de 500 segundos
+- Respaldo previo exacto de la configuracion global en config_backups/codex_config_bak_20261125_211756_404079.toml; conservado localmente y excluido de Git porque puede contener configuracion sensible.
+- %USERPROFILE%/.codex/config.toml: tool_timeout_sec de antigravity_bridge cambiado de 90 a 500.
+- config_compartida/config.toml: timeout de la misma seccion cambiado de 180 a 500.
+- Ambas configuraciones validadas con tomllib; solo cambio ese valor, guardadas UTF-8 sin BOM.
+- Recargar MCP o abrir una sesion nueva para aplicar el timeout al cliente.
