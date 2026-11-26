@@ -495,3 +495,11 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - config_compartida/config.toml: timeout de la misma seccion cambiado de 180 a 500.
 - Ambas configuraciones validadas con tomllib; solo cambio ese valor, guardadas UTF-8 sin BOM.
 - Recargar MCP o abrir una sesion nueva para aplicar el timeout al cliente.
+
+### 2026-11-25 - Instalador sincroniza reglas globales y timeout MCP
+- Respaldo previo de %USERPROFILE%/.codex/AGENTS.md en config_backups/codex_agents_bak_20261125.md; conservado localmente, sin versionarlo.
+- Copia global de AGENTS.md reemplazada por la del repositorio, UTF-8 sin BOM y SHA256 identico.
+- scripts/instalar_verificador_10m.ps1: copia siempre las reglas globales y verifica igualdad SHA256; establece tool_timeout_sec=500 solo en la tabla antigravity_bridge, respaldando config.toml antes de modificarlo. Si ya vale 500, no lo reescribe ni genera otro respaldo.
+- Conserva registro cada 10 minutos y ejecucion inmediata del verificador. Configuraciones ausentes/ambiguas o timeout con formato inesperado producen error claro, sin sobrescribirlas.
+- Parser PowerShell aprobado; pruebas aisladas de reemplazo, preservacion de otras tablas, respaldo, idempotencia y clave ausente aprobadas. TOML global validado con tomllib.
+- Ejecucion real del instalador: salida 0, tarea registrada; 2026-11-25 21:23:25 -03:00 OK.
