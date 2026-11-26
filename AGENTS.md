@@ -31,3 +31,7 @@ Si una tarea se traba o requiere frenar por riesgo (permisos, red, datos, hardwa
 - Al terminar cualquier tarea que modifique archivos (sin esperar a que el usuario diga "terminamos"), sobrescribí `ESTADO.md` en la raíz del proyecto actual en UTF-8 sin BOM (máximo 25 líneas: fecha, qué quedó hecho/verificado, qué falló o quedó bloqueado, y próximo paso exacto).
 - Si el proyecto tiene Git, incluí `ESTADO.md` en el commit/push. No actualices `ESTADO.md` en consultas de solo lectura.
 - Solo si trabajás en una carpeta local sin Git ni sincronización en la nube, guardá el respaldo en `C:\dos_agentes_local\project_states\ESTADO_<PROYECTO>.md`.
+
+## Delegación técnica y validación con Chat Fijo Gemini
+
+- En toda tarea técnica o de código (salvo que el usuario escriba `sin puente`), delegá análisis/borradores a `mcp__antigravity_bridge__antigravity_ask` y validá el siguiente paso o cierre con `mcp__antigravity_bridge__gemini_ask` antes de entregar el resultado final.

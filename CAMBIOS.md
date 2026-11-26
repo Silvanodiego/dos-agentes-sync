@@ -479,3 +479,12 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - scripts/test_piloto_resiliencia.py: 10 pruebas con mocks aprobadas (inactividad, actividad, tope total, reintento exitoso/limitado, vacio, cierre final, credenciales y recuperacion Gemini sin doble envio). py_compile y parser PowerShell aprobados; argumentos CLI/defaults identicos al respaldo.
 - Instalador ejecutado dos veces sin errores: tarea Listo, intervalo PT10M; ultima corrida 2026-11-25 20:31:45 -03:00 OK. Sin consultas reales a modelos.
 - .gitignore: excepcion limitada al respaldo autorizado del piloto para versionarlo sin git add -f. AGENTS.md, bridge_server.py y chat_fijo_gemini.py conservan sus hashes.
+
+### 2026-11-25 - Herramienta gemini_ask en el MCP activo
+- Servidor real Node.js: antigravity_mcp.mjs; respaldo previo exacto en config_backups/antigravity_mcp_bak_20261125.mjs. No existe un servidor Python que requiera py_compile para este cambio.
+- Nueva herramienta gemini_ask(prompt): ejecuta el Python de .venv con chat_fijo_gemini.py --project DOS_AGENTES --timeout 180, prompt por stdin UTF-8, proceso oculto y limite externo de 200 s. Devuelve stdout limpio o el error original.
+- Solo ante fallo de conexion CDP 9222 ejecuta una vez verificar_flujo_10m.ps1 (limite 90 s) y reintenta una vez. No reenvia por autenticacion, respuesta vacia ni timeout de generacion.
+- AGENTS.md y config_compartida/AGENTS.md: agregada regla de analisis con antigravity_ask y validacion con gemini_ask salvo sin puente; reglas previas conservadas y SHA256 identico.
+- scripts/test_gemini_mcp.mjs: 10 pruebas aprobadas, con mocks de Gemini, ejecucion local UTF-8, timeout real corto y descubrimiento MCP stdio de las tres herramientas sin consultas a modelos. Sintaxis validada con node --check.
+- .gitignore: excepcion limitada al respaldo MCP autorizado; bridge_server.py, piloto_gemini.py y chat_fijo_gemini.py conservan su SHA256.
+- Activacion: recargar el servidor MCP o abrir una nueva sesion. El cliente configurado tiene tool_timeout_sec=90; para permitir todo el presupuesto con recuperacion y reintento debe ajustarse a 500 en la seccion mcp_servers.antigravity_bridge. No se modifico config.toml.

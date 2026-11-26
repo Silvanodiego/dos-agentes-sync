@@ -83,3 +83,6 @@ chrome_gemini_profile/
 
 # Respaldo del piloto autorizado el 2026-11-25.
 !/config_backups/piloto_gemini_bak_20261125.py
+
+# Respaldo autorizado del servidor MCP.
+!/config_backups/antigravity_mcp_bak_20261125.mjs
