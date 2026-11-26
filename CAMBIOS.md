@@ -503,3 +503,10 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - Conserva registro cada 10 minutos y ejecucion inmediata del verificador. Configuraciones ausentes/ambiguas o timeout con formato inesperado producen error claro, sin sobrescribirlas.
 - Parser PowerShell aprobado; pruebas aisladas de reemplazo, preservacion de otras tablas, respaldo, idempotencia y clave ausente aprobadas. TOML global validado con tomllib.
 - Ejecucion real del instalador: salida 0, tarea registrada; 2026-11-25 21:23:25 -03:00 OK.
+
+### 2026-11-26 - Regla obligatoria de flujo al principio de AGENTS.md
+- AGENTS.md y config_compartida/AGENTS.md: nuevo bloque obligatorio en la linea 1, delegacion AG y validacion Gemini para todos los turnos salvo sin puente, ejecucion de pasos disponibles y cierre de flujo.
+- Eliminada la seccion anterior duplicada de delegacion tecnica; todas las demas reglas se conservan.
+- Copia global %USERPROFILE%/.codex/AGENTS.md actualizada; tres SHA256 identicos y UTF-8 sin BOM.
+- Verificacion: primeras 12 lineas leidas desde disco; sin consultas a modelos por pedido sin puente.
+- Estado previo ajeno: scripts/sdetecno/decidir_respuesta.js y scripts/sdetecno/test_decidir_respuesta.js sin seguimiento; conservados fuera de este commit.
