@@ -1,5 +1,16 @@
 # Registro de cambios
 
+## 2026-11-26 - SDeTecno: lectura correcta de respuestas y cortesia sin cargo
+
+- `scripts/sdetecno/decidir_respuesta.js`: el nodo reconoce `content.parts`, ademas de `candidates`, `text` y `output`; ignora partes de razonamiento y valida JSON y acciones permitidas.
+- Un error tecnico de formato registra una advertencia y responde con una salida neutral; no inventa una derivacion ni una solucion. Conserva los bloqueos de envio y las autorizaciones comerciales posteriores.
+- Publicado en el flujo activo cambiando solo `Decidir respuesta`, con respaldo privado y recuperacion comprobada. Los otros veinte flujos conservaron su estado y version.
+- Verificacion: 29 pruebas JavaScript, cuatro controles aislados contra el autorizador real, reproduccion de la respuesta almacenada que provocaba el fallo, coincidencia de la version publicada y HTTP200 de ambos servicios.
+- Cortesia autorizada: codigo adicional de siete dias para un dispositivo, precio confirmado cero, sin deuda, enlace de pago, ingreso ni recordatorios de deuda. Accesos y vouchers previos conservados.
+- Envio unico con leyenda para el cuidador de la noche; historial de WhatsApp confirma ACK `DEVICE`. Canje posterior a cargo del cuidador.
+- Los codigos, telefonos, credenciales y recibos privados permanecen fuera de Git. Respaldo servidor: `/root/sdetecno/backups/parser_cortesia_20261126_231038/`.
+- Consulta tecnica generica a Antigravity realizada. Chat Fijo Gemini encontro un borrador y no lo sobrescribio; cierre sujeto a las verificaciones reales indicadas.
+
 ## 2026-11-24 - Reparacion V8: formatos nativos distintos y Git local bloqueado
 
 - `scripts/chats/sync_chats_abierto.py`: detecta el indice SQLite con o sin
