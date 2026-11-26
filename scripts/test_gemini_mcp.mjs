@@ -19,7 +19,7 @@ test('respuesta limpia, CLI real, stdin UTF-8 y timeout de 200 segundos', async 
   const { run, calls } = runner(['  CONEXION_OK\n']);
   assert.deepEqual(await geminiAsk('Consulta ñ', run), {content:[{type:'text',text:'CONEXION_OK'}]});
   assert.equal(calls[0][0], String.raw`C:\dos_agentes_local\.venv\Scripts\python.exe`);
-  assert.deepEqual(calls[0][1], [String.raw`C:\dos_agentes_local\chat_fijo_gemini.py`, '--project', 'DOS_AGENTES', '--timeout', '180']);
+  assert.deepEqual(calls[0][1], [String.raw`C:\dos_agentes_local\chat_fijo_gemini.py`, '--project', 'DOS_AGENTES', '--timeout', '180', '--limpiar-borrador']);
   assert.deepEqual(calls[0][2], {input:'Consulta ñ',timeout:200000});
 });
 test('fallo CDP ejecuta verificador una vez y reintenta', async () => {

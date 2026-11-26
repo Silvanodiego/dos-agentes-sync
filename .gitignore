@@ -86,3 +86,6 @@ chrome_gemini_profile/
 
 # Respaldo autorizado del servidor MCP.
 !/config_backups/antigravity_mcp_bak_20261125.mjs
+
+# Respaldo Chat Fijo Gemini autorizado el 2026-11-26.
+!/config_backups/chat_fijo_gemini_bak_20261126.py

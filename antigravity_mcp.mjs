@@ -90,7 +90,7 @@ export async function geminiAsk(prompt, run = runLocal) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const response = await run(join(root, '.venv', 'Scripts', 'python.exe'),
-        [join(root, 'chat_fijo_gemini.py'), '--project', 'DOS_AGENTES', '--timeout', '180'],
+        [join(root, 'chat_fijo_gemini.py'), '--project', 'DOS_AGENTES', '--timeout', '180', '--limpiar-borrador'],
         { input: prompt, timeout: 200000 });
       if (!response.trim()) throw new Error('Gemini devolvio una respuesta vacia.');
       return { content: [{ type: 'text', text: response.trim() }] };

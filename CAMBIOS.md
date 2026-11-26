@@ -510,3 +510,11 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - Copia global %USERPROFILE%/.codex/AGENTS.md actualizada; tres SHA256 identicos y UTF-8 sin BOM.
 - Verificacion: primeras 12 lineas leidas desde disco; sin consultas a modelos por pedido sin puente.
 - Estado previo ajeno: scripts/sdetecno/decidir_respuesta.js y scripts/sdetecno/test_decidir_respuesta.js sin seguimiento; conservados fuera de este commit.
+
+### 2026-11-26 - Limpieza opcional de borrador para gemini_ask
+- Respaldo previo exacto: config_backups/chat_fijo_gemini_bak_20261126.py. Excepcion .gitignore limitada a ese respaldo autorizado.
+- chat_fijo_gemini.py: nuevo flag --limpiar-borrador, limpia el editor con fill vacio y comprueba que quedo vacio antes de escribir/enviar. Sin el flag conserva el rechazo anterior y el borrador. Si no logra limpiar, aborta sin enviar.
+- antigravity_mcp.mjs: gemini_ask pasa --limpiar-borrador al CLI real; mantiene timeout y recuperacion existentes.
+- scripts/test_gemini_borrador.py: 4 pruebas mock aprobadas: CLI con borrador, conservacion sin flag, textarea y fallo de limpieza sin envio. scripts/test_gemini_mcp.mjs actualizado al nuevo argumento, 10 pruebas aprobadas.
+- py_compile y node --check aprobados; sin consultas reales a modelos por pedido sin puente.
+- Archivos preexistentes sin seguimiento en scripts/sdetecno/ conservados fuera de este cambio.

@@ -390,7 +390,7 @@ class GeminiChat:
             raise ChatFijoError("No se pudo confirmar el modelo seleccionado; no se envió el mensaje.")
         self.web_model = selected
 
-    def ask(self, prompt: str, timeout: float = 180) -> str:
+    def ask(self, prompt: str, timeout: float = 180, *, limpiar_borrador: bool = False) -> str:
         if not prompt.strip():
             raise ChatFijoError("El mensaje no puede estar vacío.")
         self.message_sent = False
@@ -406,7 +406,12 @@ class GeminiChat:
             raise ChatFijoError("El chat empezó otra generación durante la estabilización; no se envió el mensaje.")
         draft = editor.inner_text() if editor.get_attribute("contenteditable") else editor.input_value()
         if draft.strip():
-            raise ChatFijoError("Hay un borrador en el editor; se conserva sin sobrescribirlo.")
+            if not limpiar_borrador:
+                raise ChatFijoError("Hay un borrador en el editor; se conserva sin sobrescribirlo.")
+            editor.fill("")
+            remaining = editor.inner_text() if editor.get_attribute("contenteditable") else editor.input_value()
+            if remaining.strip():
+                raise ChatFijoError("No se pudo limpiar el borrador del editor; no se envió el mensaje.")
         tracker = ResponseTracker(self.page.evaluate(SNAPSHOT_JS))
         editor.fill(prompt)
         self.message_sent = True  # Incluso si el clic falla, nunca repetir automáticamente.
@@ -429,6 +434,7 @@ def main(argv=None) -> int:
     parser.add_argument("--project", default="DOS_AGENTES")
     parser.add_argument("--message", help="Si falta, se lee de stdin; no se usa con --check")
     parser.add_argument("--check", action="store_true", help="Solo conecta a CDP; no abre pestañas ni envía mensajes")
+    parser.add_argument("--limpiar-borrador", action="store_true", help="Descarta el borrador del editor antes de enviar; sin el flag se conserva")
     parser.add_argument("--json-result", action="store_true", help="Devuelve modelo web y respuesta en JSON")
     parser.add_argument("--timeout", type=float, default=180)
     parser.add_argument("--connect-timeout", type=float, default=5)
@@ -444,7 +450,7 @@ def main(argv=None) -> int:
             message = args.message if args.message is not None else sys.stdin.read()
             with chat_lock(config.project), GeminiChat(resolve_chat(args.project), args.connect_timeout) as chat:
                 try:
-                    answer = chat.ask(message, args.timeout)
+                    answer = chat.ask(message, args.timeout, limpiar_borrador=True) if args.limpiar_borrador else chat.ask(message, args.timeout)
                     if args.json_result:
                         print(json.dumps({"model": chat.web_model, "response": answer,
                                           "url": chat.config.url, "note": chat.model_note}, ensure_ascii=False))

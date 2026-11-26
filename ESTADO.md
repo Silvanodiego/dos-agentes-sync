@@ -1,8 +1,9 @@
 # Estado del proyecto
 Fecha: 2026-11-26 (America/Buenos_Aires).
-Hecho: regla obligatoria de flujo en linea 1 de ambas copias AGENTS.md del repositorio.
-Hecho: seccion previa equivalente eliminada sin alterar las demas reglas.
-Hecho: copia global actualizada; tres archivos identicos, UTF-8 sin BOM.
-Verificado: SHA256 de las tres copias y primeras 12 lineas de la global leidas desde disco.
-Pendiente ajeno: dos archivos sin seguimiento preexistentes en scripts/sdetecno/, fuera del alcance del commit.
-Proximo paso exacto: revisar esos dos archivos con su autor para decidir su versionado; se conservaron intactos.
+Hecho: respaldo previo exacto config_backups/chat_fijo_gemini_bak_20261126.py.
+Hecho: --limpiar-borrador limpia y confirma editor vacio antes de enviar; sin flag conserva el borrador.
+Hecho: gemini_ask pasa el flag automaticamente, manteniendo timeout y recuperacion CDP.
+Verificado: py_compile, node --check, 4 pruebas Python mock y 10 pruebas MCP aprobadas.
+Verificado: limpieza CLI con borrador envia una sola vez; fallo de limpieza no envia nada.
+Pendiente ajeno: scripts/sdetecno/ con archivos preexistentes sin seguimiento; conservados intactos.
+Proximo paso exacto: recargar el servidor MCP para que el proceso Node activo use el nuevo argumento.
