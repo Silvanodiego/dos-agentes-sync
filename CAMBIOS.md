@@ -529,3 +529,14 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - scripts/test_gemini_borrador.py: 4 pruebas mock aprobadas: CLI con borrador, conservacion sin flag, textarea y fallo de limpieza sin envio. scripts/test_gemini_mcp.mjs actualizado al nuevo argumento, 10 pruebas aprobadas.
 - py_compile y node --check aprobados; sin consultas reales a modelos por pedido sin puente.
 - Archivos preexistentes sin seguimiento en scripts/sdetecno/ conservados fuera de este cambio.
+
+### 2026-11-27 - DNS verificado y reclamos de conectividad del bot
+- Reproducido fallo de resolucion a traves del DNS del modem; resolucion directa mediante ambos DNS publicos correcta. La evidencia actual no permite atribuir todos los reclamos historicos a este fallo.
+- Con aprobacion expresa, DNS del router fijados en 8.8.8.8,1.1.1.1; use-peer-dns=no en el cliente DHCP WAN y cache DNS vaciada. Configuracion previa y recibo privado: /root/sdetecno/backups/dns_20261127_232005/.
+- Verificado despues: DNS dinamico vacio, DHCP bound, ruta activa, cuatro dominios resueltos, ping publico 4/4 y cinco sesiones activas. Trafico real de clientes observado en ether2 y ether3.
+- scripts/sdetecno/bot_experiencia.py: detector de reclamos antes de cotizar, chat resuelto antes del ticket y respuesta determinista de soporte; pago ya realizado no se confunde con ayuda para pagar. Conserva consultas comerciales y asistencia inicial de pago.
+- Pruebas aisladas sin red ni datos reales: 10/10 en local y servidor; revision independiente de seis regresiones adicionales, deduplicacion por lote/familia y conservacion de la respuesta verificada en finalize.
+- Desplegado hash 5365aa3d955fa0390533830a361fb3a1a4804acdefc54aefd83158eb7d8948c6; comparacion AST confirma solo helper nuevo y commerce. Respaldo y recibo privado: /root/sdetecno/backups/bot_conectividad_20261127_232853/.
+- Recarga gradual Gunicorn verificada con worker nuevo y master conservado; servicio activo y /precios HTTP200. No se enviaron mensajes de prueba a clientes.
+- Hallazgo fisico pendiente: ether3 negocia 10 Mbps full duplex con autonegociacion activa; no demuestra por si solo la causa de los reclamos. Probar otro cable Ethernet y revisar conectores; si persiste, probar otro puerto o revisar el AP.
+- Antigravity agoto el tiempo; revision automatica bloqueo Gemini por detalles internos de infraestructura. Validacion completada mediante pruebas y revision locales, sin reintentos externos.

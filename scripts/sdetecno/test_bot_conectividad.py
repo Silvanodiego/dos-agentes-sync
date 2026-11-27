@@ -87,6 +87,8 @@ class ConectividadTest(unittest.TestCase):
             "Estoy conectado pero sin internet",
             "Se me corta el wifi",
             "El wifi no me anda",
+            "Sigo sin acceso al wifi",
+            "El wifi se desconecta a cada rato",
         ]
         for n, texto in enumerate(frases):
             with self.subTest(texto=texto):
@@ -103,19 +105,30 @@ class ConectividadTest(unittest.TestCase):
                 self.reclamar(texto, "plan_falla_" + str(n))
 
     def test_consultas_comerciales_no_crean_soporte(self):
-        for texto in ["Precios del wifi", "No tengo código", "No tengo código para wifi", "No puedo pagar wifi", "wifi", "Cuánto cuesta 7 días", "Cómo me conecto al wifi", "Quiero comprar un plan de 7 días"]:
+        for texto in ["Precios del wifi", "No tengo código", "No tengo código para wifi", "No puedo pagar wifi", "wifi", "El wifi no se corta, quiero pagar7d", "Se me cortó la luz, quiero comprar wifi7d", "Cuánto cuesta 7 días", "Cómo me conecto al wifi", "Quiero comprar un plan de 7 días"]:
             with self.subTest(texto=texto):
                 bot.commerce(self.backend, "cliente_prueba@lid", texto, "comercial")
                 self.assertEqual(self.filas("support"), [])
         self.assertTrue(self.link.called)
 
+    def test_pago_realizado_no_desvia_reclamo_a_pago(self):
+        for n, texto in enumerate([
+            "Pagué por Mercado Pago y no funciona internet",
+            "Mi plan ya está pago y no tengo internet",
+            "El servicio está pagado y no funciona el wifi",
+        ]):
+            with self.subTest(texto=texto):
+                self.reclamar(texto, "pagado_" + str(n))
+
     def test_pago_sin_internet_preserva_ayuda_inicial(self):
-        r = bot.commerce(self.backend, "cliente_prueba@lid", "No tengo internet para pagar el plan de 7 días", "pago")
-        self.assertTrue(r["handled"])
-        self.assertIn("conexión disponible", r["respuesta"])
-        self.assertEqual(self.filas("support"), [])
-        self.link.assert_not_called()
-        self.menu.assert_not_called()
+        for texto in ["No tengo internet para pagar el plan de 7 días", "No tengo internet para abrir el link de pago", "El plan no está pago y no tengo internet para pagar"]:
+            with self.subTest(texto=texto):
+                r = bot.commerce(self.backend, "cliente_prueba@lid", texto, "pago")
+                self.assertTrue(r["handled"])
+                self.assertIn("conexión disponible", r["respuesta"])
+                self.assertEqual(self.filas("support"), [])
+                self.link.assert_not_called()
+                self.menu.assert_not_called()
 
     def test_ayuda_para_pagar_preserva_ticket_de_pago(self):
         r = bot.commerce(self.backend, "cliente_prueba@lid", "Ayuda para pagar", "pago")

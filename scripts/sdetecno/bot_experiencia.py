@@ -114,14 +114,17 @@ def connectivity_claim(text):
     if re.search(r'\b(?:no\s+(?:me\s+)?(?:puedo|logro|deja|permite)\s+|sin\s+poder\s+)'+action+r'\b',t):
         return True
     network=r'(?:internet|wi[\s-]*fi|conexion|servicio)'
-    if re.search(r'\b(?:sin|no\s+(?:tengo|tenemos|hay))\s+(?:acceso\s+a\s+)?(?:el\s+|la\s+)?'+network+r'\b',t):
+    if re.search(r'\b(?:sin|no\s+(?:tengo|tenemos|hay))\s+(?:acceso\s+(?:a\s+|al\s+))?(?:el\s+|la\s+)?'+network+r'\b',t):
         return True
-    failure=r'(?:no\s+(?:(?:me|nos|se)\s+)?(?:anda|funciona|conecta)|se\s+(?:(?:me|nos)\s+)?cort[oa]|anda\s+mal)'
-    return bool(re.search(r'\b'+failure+r'\b.{0,45}\b'+network+r'\b|\b'+network+r'\b.{0,45}\b'+failure+r'\b',t))
+    failure=r'(?:no\s+(?:(?:me|nos|se)\s+)?(?:anda|funciona|conecta)|(?<!no )(?<!nunca )se\s+(?:(?:me|nos)\s+)?(?:cort[oa]|desconecta)|anda\s+mal)'
+    before=r'\b'+failure+r'\s+(?:(?:el|la|mi|nuestro|nuestra)\s+)?'+network+r'\b'
+    after=r'\b'+network+r'\s+'+failure+r'\b'
+    return bool(re.search(before+'|'+after,t))
 
 def commerce(b,chat,text,batch):
     t=norm(text);now=time.time();s=state(chat)
-    if re.search(r'(no tengo|sin|no hay|no me anda|no funciona).{0,25}(internet|conexion|datos)',t) and re.search(r'pagar|pago|mercado|link|enlace|transfer',t):
+    paid_reported=bool(re.search(r'\b(?:pague|pagamos|pago\s+(?:hecho|realizado|aprobado)|(?<!no )(?<!sin )(?:esta|quedo)\s+pag(?:o|ado))\b',t))
+    if re.search(r'(no tengo|sin|no hay|no me anda|no funciona).{0,25}(internet|conexion|datos)',t) and re.search(r'pagar|pago|mercado|link|enlace|transfer',t) and not paid_reported:
         return {'handled':True,'respuesta':'Para abrir el pago necesitás una conexión disponible. Si el portal de la red «Internet» te ofrece una prueba gratuita, podés usarla para pagar. Si no aparece, escribí «ayuda para pagar» y queda registrado para asistencia. No hace falta comprar otro código.'}
     if 'ayuda para pagar' in t:
         i=ticket(chat,batch,'conectividad_para_pago',text);return {'handled':True,'respuesta':f'Quedó registrada tu consulta #{i}: no podés abrir el pago por falta de conexión. Falta que el equipo técnico compruebe el acceso; todavía no está resuelto.'}
