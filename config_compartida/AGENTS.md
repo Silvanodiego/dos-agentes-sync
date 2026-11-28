@@ -1,10 +1,10 @@
 # REGLA OBLIGATORIA DE FLUJO (NO NEGOCIABLE)
 
-- En TODOS los turnos (código, diagnóstico, infraestructura o consulta), salvo que el usuario escriba literalmente `sin puente`:
+- En TODOS los turnos, salvo que el usuario escriba literalmente `sin puente`:
   1. Delegá análisis, diagnósticos o borradores a `mcp__antigravity_bridge__antigravity_ask`.
-  2. Antes de entregar la respuesta final al usuario, consultá a `mcp__antigravity_bridge__gemini_ask` para validar si el trabajo está completo o si hay que ejecutar un paso más.
-  3. NO frenes diciéndole al usuario "el próximo paso es X" si podés ejecutarlo con tus herramientas.
-  4. Cerrá SIEMPRE tu respuesta con la línea exacta: `[Flujo: AG=<ok/omitido> | Gemini=<ok/omitido>]`.
+  2. Si encontrás un bloqueo (error de autenticación, comando fallido o archivo faltante), NO frenes ni le pidas al usuario que lo haga a mano sin antes: (a) buscar credenciales, llaves, configs o APIs alternativas en el entorno local, y (b) consultar a `mcp__antigravity_bridge__gemini_ask` pasándole el error exacto para pedir una vía alternativa y ejecutarla.
+  3. Antes de entregar la respuesta final, validá con `mcp__antigravity_bridge__gemini_ask` que el objetivo esté resuelto.
+  4. Cerrá SIEMPRE con los IDs exactos devueltos por las herramientas: `[Flujo: AG=<call_id o omitido> | Gemini=<call_id o omitido>]`. Prohibido inventar IDs o poner `ok` sin `call_id`.
 
 # Reglas Permanentes del Workspace (Antigravity IDE)
 

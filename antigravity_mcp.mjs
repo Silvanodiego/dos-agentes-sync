@@ -2,9 +2,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import * as z from 'zod/v4';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, open, unlink } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execFile } from 'node:child_process';
 
@@ -50,13 +52,73 @@ server.registerTool('antigravity_ask', {
     model: z.enum(models).default('gemini-4-argon-high')
   },
   annotations: { readOnlyHint: true, openWorldHint: true }
-}, async ({ prompt, model }) => {
+}, async ({ prompt, model }) => auditedCall('antigravity_ask', async () => {
   try { return output(await request('/ask', { prompt, model })); }
   catch (error) { return { ...output({ error: error.message }), isError: true }; }
-});
+}));
 
 
 const root = String.raw`C:\dos_agentes_local`;
+
+// Solo metadatos: nunca guardar prompts, respuestas ni errores con datos sensibles.
+export function newCallId(tool, now = new Date()) {
+  const prefix = tool === 'antigravity_ask' ? 'AG' : 'GEM';
+  const time = [now.getHours(), now.getMinutes(), now.getSeconds()]
+    .map(value => String(value).padStart(2, '0')).join('');
+  return `${prefix}-${time}-${randomBytes(2).toString('hex').toUpperCase()}`;
+}
+
+function localTimestamp(now) {
+  const pad = value => String(value).padStart(2, '0');
+  const offset = -now.getTimezoneOffset();
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ` +
+    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())} ` +
+    `${offset >= 0 ? '+' : '-'}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`;
+}
+
+export async function writeAudit(entry, file = join(root, 'logs', 'mcp_calls.log')) {
+  await mkdir(dirname(file), { recursive: true });
+  const lockFile = file + '.lock';
+  const deadline = performance.now() + 2000;
+  let lock;
+  // Coordina procesos MCP simultaneos; un bloqueo nunca espera indefinidamente.
+  while (!lock) {
+    try { lock = await open(lockFile, 'wx'); }
+    catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      if (performance.now() >= deadline) throw new Error('Timeout al bloquear la auditoria MCP.');
+      await new Promise(resolveWait => setTimeout(resolveWait, 25));
+    }
+  }
+  try {
+    let previous = '';
+    try { previous = await readFile(file, 'utf8'); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    const line = `${localTimestamp(entry.date)} herramienta=${entry.tool} call_id=${entry.callId} estado=${entry.status} duracion_ms=${entry.duration}`;
+    const lines = previous.split(/\r?\n/).filter(Boolean);
+    lines.push(line);
+    await writeFile(file, lines.slice(-500).join('\n') + '\n', 'utf8');
+  } finally {
+    try { await lock.close(); } finally { await unlink(lockFile); }
+  }
+}
+
+export async function auditedCall(tool, operation, audit = writeAudit) {
+  const callId = newCallId(tool);
+  const started = performance.now();
+  let result;
+  try { result = await operation(); }
+  catch (error) { result = { content: [{ type: 'text', text: error.message }], isError: true }; }
+  try {
+    await audit({date: new Date(), tool, callId, status: result.isError ? 'ERROR' : 'OK',
+      duration: Math.max(0, Math.round(performance.now() - started))});
+  } catch {
+    // No presentar como exito una llamada que no pudo auditarse.
+    result = { ...result, isError: true, content: [...result.content,
+      { type: 'text', text: 'ERROR_AUDITORIA_MCP: no se pudo registrar la llamada localmente.' }] };
+  }
+  return { ...result, content: [...result.content, { type: 'text', text: `[MCP_CALL_ID: ${callId}]` }] };
+}
 
 // El prompt viaja por stdin, nunca en argumentos de proceso ni por un shell.
 export function runLocal(file, args, { input = '', timeout = 200000 } = {}) {
@@ -114,7 +176,7 @@ server.registerTool('gemini_ask', {
   description: 'Consulta el Chat Fijo Gemini de DOS_AGENTES via CDP 9222. Devuelve texto limpio; recupera y reintenta una vez solo ante fallo de conexion CDP. Cada proceso tiene timeout de 200 segundos.',
   inputSchema: { prompt: z.string().min(1).describe('Consulta sin credenciales para el chat fijo Gemini.') },
   annotations: { readOnlyHint: false, openWorldHint: true }
-}, async ({ prompt }) => geminiAsk(prompt));
+}, async ({ prompt }) => auditedCall('gemini_ask', () => geminiAsk(prompt)));
 
 // Permite importar el mismo servidor en pruebas sin abrir stdio.
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

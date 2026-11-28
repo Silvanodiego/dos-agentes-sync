@@ -540,3 +540,12 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - Recarga gradual Gunicorn verificada con worker nuevo y master conservado; servicio activo y /precios HTTP200. No se enviaron mensajes de prueba a clientes.
 - Hallazgo fisico pendiente: ether3 negocia 10 Mbps full duplex con autonegociacion activa; no demuestra por si solo la causa de los reclamos. Probar otro cable Ethernet y revisar conectores; si persiste, probar otro puerto o revisar el AP.
 - Antigravity agoto el tiempo; revision automatica bloqueo Gemini por detalles internos de infraestructura. Validacion completada mediante pruebas y revision locales, sin reintentos externos.
+
+### 2026-11-27 - MCP con call_id verificable y reglas anti-bloqueo
+- Respaldos previos exactos: config_backups/antigravity_mcp_bak_20261127.mjs y chat_fijo_gemini_bak_20261127.py. Excepciones puntuales en .gitignore para versionarlos.
+- antigravity_mcp.mjs: cada antigravity_ask/gemini_ask agrega ID AG/GEM-HHMMSS-XXXX y auditoria local de metadatos (fecha, herramienta, ID, OK/ERROR, ms); conserva 500 lineas con bloqueo entre procesos acotado a 2 segundos. Si falla la auditoria, devuelve error explicito con ID.
+- Confirmado y conservado --limpiar-borrador en chat_fijo_gemini.py y en la invocacion de gemini_ask; no fue necesario modificar el Python.
+- Reemplazado solo el bloque inicial de flujo en ambos AGENTS.md; copia global identica. Excepcion sin puente respetada durante esta tarea.
+- SSH local: clave publica id_ed25519.pub verificada y Host nas configurado sin alterar otros hosts. Ninguna llave o config SSH se incluye en Git.
+- Verificado: node --check y py_compile; 16 pruebas Node y 4 Python con mocks aprobadas. Auditoria probada en archivo temporal, sin consultas a modelos ni registros ficticios en el log operativo.
+- bridge_server.py y piloto_gemini.py intactos; scripts/sdetecno/ excluido de este cambio.
