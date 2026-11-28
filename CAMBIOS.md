@@ -549,3 +549,8 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - SSH local: clave publica id_ed25519.pub verificada y Host nas configurado sin alterar otros hosts. Ninguna llave o config SSH se incluye en Git.
 - Verificado: node --check y py_compile; 16 pruebas Node y 4 Python con mocks aprobadas. Auditoria probada en archivo temporal, sin consultas a modelos ni registros ficticios en el log operativo.
 - bridge_server.py y piloto_gemini.py intactos; scripts/sdetecno/ excluido de este cambio.
+
+### 2026-11-27 - Acceso SSH del NAS desde OpenMediaVault
+- Cuenta normal existente: guardados shell interactivo, grupo SSH y clave publica desde el panel. El registro confirma que paso el bloqueo por grupo; la autenticacion por clave sigue pendiente de desplegar.
+- Confirmado que la carpeta de peliculas sigue publicada en SMB. Pendiente el inventario del disco y la comprobacion en Jellyfin.
+- Conservados los cambios pendientes previos de almacenamiento y cuotas. Para desplegar solo SSH, usar `omv-salt deploy run ssh` desde una consola administradora existente y repetir la prueba de conexion.

@@ -11,3 +11,8 @@ Verificado: 16 pruebas Node y 4 Python aprobadas con mocks; sin llamadas a model
 Verificado: bridge_server.py y piloto_gemini.py conservados; scripts/sdetecno/ fuera de este cambio.
 Bloqueos: ninguno en las comprobaciones locales.
 Proximo paso exacto: recargar el servidor MCP en la proxima sesion para utilizar el codigo actualizado.
+
+## NAS
+- Guardados shell, grupo SSH y clave publica para la cuenta normal. Verificado el permiso de grupo; la clave aun es rechazada.
+- Verificada la carpeta de peliculas en SMB desde OMV. Falta revisar el contenido y la biblioteca.
+- Proximo paso desde una consola administradora: omv-salt deploy run ssh. Despues verificar la conexion SSH antes de inspeccionar los archivos.
