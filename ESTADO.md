@@ -13,6 +13,6 @@ Bloqueos: ninguno en las comprobaciones locales.
 Proximo paso exacto: recargar el servidor MCP en la proxima sesion para utilizar el codigo actualizado.
 
 ## NAS
-- Guardados shell, grupo SSH y clave publica para la cuenta normal. Verificado el permiso de grupo; la clave aun es rechazada.
-- Verificada la carpeta de peliculas en SMB desde OMV. Falta revisar el contenido y la biblioteca.
-- Proximo paso desde una consola administradora: omv-salt deploy run ssh. Despues verificar la conexion SSH antes de inspeccionar los archivos.
+- SSH por clave verificado con la cuenta normal.
+- Agrupados y verificados seis episodios de Avatar en la carpeta indexada, con originales intactos.
+- Pendiente: iniciar escaneo de Peliculas y series desde Jellyfin y verificar seis entradas en el indice.

@@ -554,3 +554,8 @@ y [comprobaciones del editor](https://playwright.dev/python/docs/actionability).
 - Cuenta normal existente: guardados shell interactivo, grupo SSH y clave publica desde el panel. El registro confirma que paso el bloqueo por grupo; la autenticacion por clave sigue pendiente de desplegar.
 - Confirmado que la carpeta de peliculas sigue publicada en SMB. Pendiente el inventario del disco y la comprobacion en Jellyfin.
 - Conservados los cambios pendientes previos de almacenamiento y cuotas. Para desplegar solo SSH, usar `omv-salt deploy run ssh` desde una consola administradora existente y repetir la prueba de conexion.
+
+### 2026-11-27 - SSH comprobado y Avatar preparado para Jellyfin
+- SSH por clave verificado con la cuenta normal.
+- Verificados seis episodios de Avatar en el disco de medios. Agrupados bajo Season 01 mediante enlaces relativos, sin modificar los originales.
+- El indice consultado todavia no incluye la serie. Pendiente escanear la biblioteca y verificar seis episodios indexados.
